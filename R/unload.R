@@ -1,9 +1,14 @@
 #' Unload a model from memory via REST API
 #'
 #' @param model Character. Unique identifier (\code{instance_id}) of the model
-#'   instance to unload.
+#'   instance to unload. Must be one name, given as a single string. The
+#'   string must be valid in its declared encoding and not marked `"bytes"`.
+#'   A class, names, and the S4 bit are removed before the name is sent.
 #' @param host Character. The host address of the local server. Defaults to
 #'   "http://localhost:1234".
+#' @param token Character or `NULL`. An API token for a server that requires
+#'   authentication. `NULL` reads the `rlmstudio.token` option and then the
+#'   `RLMSTUDIO_API_TOKEN` environment variable. See [rlmstudio_token].
 #' @param ... Additional arguments passed to the API request body.
 #'
 #' @note If you have loaded multiple instances of the same model using
@@ -18,7 +23,11 @@
 #'   API](https://lmstudio.ai/docs/developer/rest/unload)
 #'
 #' @return Invisibly returns a character string representing the unloaded
-#'   \code{instance_id} upon success.
+#'   \code{instance_id} upon success. It is a plain string, with no class,
+#'   names, or S4 bit.
+#'
+#' @inheritSection rlmstudio-conditions Server not running
+#' @inheritSection rlmstudio-conditions API failure
 #'
 #' @export
 #'
@@ -31,13 +40,15 @@
 #' # Unload a single specific model
 #' lms_unload("google/gemma-3-1b")
 #' }
-lms_unload <- function(model, host = "http://localhost:1234", ...) {
-  if (!is_server_running()) {
-    cli::cli_abort(
-      "The LM Studio server is not running. Run {.fn lms_server_start} first.",
-      call = NULL
-    )
-  }
+lms_unload <- function(
+  model,
+  host = "http://localhost:1234",
+  ...,
+  token = NULL
+) {
+  model <- rlm_check_id(model, "model")
+
+  stop_if_no_server(host)
 
   # Build body and merge extra args from dots
   body <- utils::modifyList(list(instance_id = model), list(...))
@@ -47,35 +58,17 @@ lms_unload <- function(model, host = "http://localhost:1234", ...) {
     msg_done = "Model {.val {model}} unloaded successfully."
   )
 
-  resp <- lms_client(host) |>
+  req <- lms_client(host, token = token) |>
     httr2::req_url_path("api/v1/models/unload") |>
-    httr2::req_body_json(body) |>
-    httr2::req_error(is_error = \(resp) FALSE) |>
-    httr2::req_perform()
+    rlm_req_body(body) |>
+    httr2::req_error(is_error = \(resp) FALSE)
+  resp <- httr2::req_perform(req)
 
   if (httr2::resp_status(resp) == 200) {
     return(invisible(model))
   }
 
-  err_msg <- tryCatch(
-    {
-      err_json <- httr2::resp_body_json(resp)
-      if (!is.null(err_json$error$message)) {
-        err_json$error$message
-      } else if (!is.null(err_json$error)) {
-        err_json$error
-      } else {
-        httr2::resp_body_string(resp)
-      }
-    },
-    error = function(e) httr2::resp_body_string(resp)
-  )
-
-  if (err_msg == "") {
-    err_msg <- paste("HTTP Status", httr2::resp_status(resp))
-  }
-
-  cli::cli_abort(c("x" = "API Unload Failed: {err_msg}"), call = NULL)
+  rlm_abort_api(resp, "API Unload Failed", request_sends_token(req))
 }
 
 #' Unload all models from memory
@@ -84,6 +77,9 @@ lms_unload <- function(model, host = "http://localhost:1234", ...) {
 #'
 #' @param host Character. The host address of the local server. Defaults to
 #'   "http://localhost:1234".
+#' @param token Character or `NULL`. An API token for a server that requires
+#'   authentication. `NULL` reads the `rlmstudio.token` option and then the
+#'   `RLMSTUDIO_API_TOKEN` environment variable. See [rlmstudio_token].
 #' @param ... Additional arguments passed to the API request body for each
 #'   unload request.
 #'
@@ -92,6 +88,18 @@ lms_unload <- function(model, host = "http://localhost:1234", ...) {
 #' @return Invisibly returns a character vector of the \code{instance_id}s that
 #'   were successfully unloaded. If no models were currently loaded, it
 #'   invisibly returns \code{NULL}.
+#'
+#' @details
+#' This function calls [list_models()] to find the loaded instances, then calls
+#' [lms_unload()] once for each one. It raises `rlmstudio_no_server` itself,
+#' before the first call. It can raise `rlmstudio_api_error` through
+#' [list_models()] and through [lms_unload()]. It can raise
+#' `rlmstudio_bad_response` through [list_models()].
+#'
+#' @inheritSection rlmstudio-conditions Server not running
+#' @inheritSection rlmstudio-conditions API failure
+#' @inheritSection rlmstudio-conditions Malformed response
+#' @inheritSection rlmstudio-conditions Malformed model list
 #'
 #' @export
 #'
@@ -104,20 +112,16 @@ lms_unload <- function(model, host = "http://localhost:1234", ...) {
 #' # Unload all currently loaded models to clear VRAM
 #' lms_unload_all()
 #' }
-lms_unload_all <- function(host = "http://localhost:1234", ...) {
-  if (!is_server_running()) {
-    cli::cli_abort(
-      "The LM Studio server is not running. Run {.fn lms_server_start} first.",
-      call = NULL
-    )
-  }
+lms_unload_all <- function(host = "http://localhost:1234", ..., token = NULL) {
+  stop_if_no_server(host)
 
   # Fetch currently active models
   active_models <- list_models(
     loaded = TRUE,
     detailed = TRUE,
     quiet = TRUE,
-    host = host
+    host = host,
+    token = token
   )
 
   # Check if there is anything to unload
@@ -126,24 +130,11 @@ lms_unload_all <- function(host = "http://localhost:1234", ...) {
     return(invisible(NULL))
   }
 
-  # Robustly extract all instance IDs from the nested list column
+  # list_models() has checked that every loaded instance carries an `id` that
+  # is a string with content, so the ids are read by that name alone.
   loaded_keys <- unlist(lapply(active_models$loaded_instances, function(x) {
-    if (is.data.frame(x)) {
-      # The API typically uses 'identifier' or 'id' for the specific instance string
-      if ("identifier" %in% names(x)) {
-        return(x$identifier)
-      }
-      if ("id" %in% names(x)) {
-        return(x$id)
-      }
-      return(as.character(x[[1]])) # Fallback to the first column
-    } else {
-      return(as.character(x))
-    }
+    x[["id"]]
   }))
-
-  # Filter out any potential NAs or empty strings just to be safe
-  loaded_keys <- Filter(function(x) !is.na(x) && x != "", loaded_keys)
 
   if (length(loaded_keys) == 0) {
     rlm_alert_info("No models are currently loaded.")
@@ -156,7 +147,7 @@ lms_unload_all <- function(host = "http://localhost:1234", ...) {
 
   # Loop through and unload each specific instance
   for (instance_id in loaded_keys) {
-    lms_unload(model = instance_id, host = host, ...)
+    lms_unload(model = instance_id, host = host, ..., token = token)
   }
 
   rlm_alert_success("All models unloaded successfully.")

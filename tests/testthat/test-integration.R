@@ -3,21 +3,13 @@ test_that("End-to-end model load and chat works", {
 
   local_mocked_bindings(
     has_lms = function() TRUE,
-    is_server_running = function() TRUE
+    is_server_running = function(...) TRUE
   )
 
   skip_if_no_lms()
   skip_if_no_server()
 
   test_model <- "google/gemma-3-1b"
-
-  # Safe teardown fallback (silences the error if it runs unmocked)
-  on.exit(
-    {
-      try(lms_unload(test_model), silent = TRUE)
-    },
-    add = TRUE
-  )
 
   httptest2::with_mock_dir("integration_e2e", {
     load_res <- lms_load(test_model)

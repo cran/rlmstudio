@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Chat Options, Conversations, and Errors</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Chat Options, Conversations, and
+Errors</h1>
+
+
+
+<p>This vignette shows you how to control a chat with a model from an R
+script. The server is the program of LM Studio that answers the requests
+of R. You pick a route, the format in which R sends a request to the
+server. You set request options, the settings that change how the model
+answers. You continue a conversation and read the whole reply of the
+server. You also catch some errors, such as a missing server or a
+refused request, so that such a call does not stop your script.</p>
+<p><code>vignette(&quot;getting-started&quot;)</code> covers what comes first:
+installing LM Studio, starting the server, and downloading
+<code>google/gemma-3-1b</code>.</p>
+<div id="start-the-server-and-load-the-model" class="section level2">
+<h2>Start the server and load the model</h2>
+<p>Start the server, and load the model into memory.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(rlmstudio)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>model <span class="ot">&lt;-</span> <span class="st">&quot;google/gemma-3-1b&quot;</span></span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># Start the server, and wait up to about 30 seconds for it to answer</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">lms_server_start</span>(<span class="at">wait =</span> <span class="dv">30</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server started successfully on the default port.</span></span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="co"># Load the model</span></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="fu">lms_load</span>(model)</span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&gt; ℹ Loading model: &quot;google/gemma-3-1b&quot;...</span></span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; loaded and verified. [11.7s]</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#&gt; </span></span></code></pre></div>
+</div>
+<div id="three-routes" class="section level2">
+<h2>Three routes</h2>
+<p>LM Studio answers chat requests in three formats, and each one is a
+route. OpenResponses and OpenAI are formats that other programs use too.
+The native format is LM Studio’s own. On every route, the request goes
+to LM Studio on your computer. The <code>api_type</code> argument of
+<code>lms_chat()</code> picks the route.</p>
+<p>The table below shows what <code>lms_chat()</code> supports on each
+route. A response id is a name that the server gives to a reply. By
+default, the server keeps the reply, so that a later call can continue
+from it. Log probabilities say how likely the model found each piece of
+its reply. A <code>schema</code> makes the reply follow a fixed shape.
+<code>?lms_chat</code> explains the <code>ttl</code> argument.</p>
+<table>
+<colgroup>
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+<col width="25%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><code>api_type</code></th>
+<th>Continue by response id</th>
+<th>Log probabilities</th>
+<th><code>schema</code> and <code>ttl</code></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>&quot;openresponses&quot;</code>, the default</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><code>&quot;openai&quot;</code></td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+<tr class="odd">
+<td><code>&quot;native&quot;</code></td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<p>The default route covers most uses. Pick <code>&quot;openai&quot;</code> for a
+<code>schema</code> or a <code>ttl</code>. The OpenAI route also takes a
+whole conversation in a data frame, through
+<code>lms_chat_openai()</code>, as a later section shows. The native
+route refuses an option name that it does not know, as the last section
+shows. <code>vignette(&quot;text-analysis&quot;)</code> shows log probabilities
+and a <code>schema</code>.</p>
+<p>Here is the same prompt on each route. A prompt is the text that you
+send to the model.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>prompt <span class="ot">&lt;-</span> <span class="st">&quot;Name one color. Answer with one word.&quot;</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co"># The default route</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt)</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue \n\nLet me know if you’d like another!&quot;</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_5cf482638f60b6dee10cb5fd6c4b254663ab888f1d48e295&quot;</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co"># The OpenAI route</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt, <span class="at">api_type =</span> <span class="st">&quot;openai&quot;</span>)</span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co"># The native route of LM Studio</span></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt, <span class="at">api_type =</span> <span class="st">&quot;native&quot;</span>)</span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_c42e41ec31f20b2124f9fc2e06ccd48f9e9ea586e5e550e7&quot;</span></span></code></pre></div>
+<p>Each call returns the text of the reply. An attribute is a named
+value that R attaches to an object, and <code>attr()</code> reads it. On
+the default route and the native route, the text also carries a
+<code>response_id</code> attribute.</p>
+</div>
+<div id="request-options" class="section level2">
+<h2>Request options</h2>
+<p>A request is made of fields. A field is one named value, such as the
+model name or the prompt. A request option is a field that changes how
+the model answers. <code>lms_chat()</code> has no argument for most of
+them. You add each one to the call by its name, and
+<code>lms_chat()</code> puts it in the request under that name. An
+option that you set to <code>NULL</code> is left out of the request. The
+LM Studio developer documentation at <a href="https://lmstudio.ai/docs/developer" class="uri">https://lmstudio.ai/docs/developer</a> lists the options of
+each route.</p>
+<p>The model writes its reply in tokens. A token is a short piece of
+text, such as a word or a part of a word. The <code>temperature</code>
+option sets how much chance goes into the choice of each token. The call
+below sets it to 0.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># Set the temperature to 0</span></span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt, <span class="at">temperature =</span> <span class="dv">0</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_c858e32caaa1abf0bb6b46a3f92492027bcf6b14b50a69cb&quot;</span></span></code></pre></div>
+<p>The package checks a few option names. For example, it stops with an
+error on a <code>stream</code> other than <code>FALSE</code> or
+<code>NULL</code>, because it reads a whole reply and not one sent in
+parts. It also stops on <code>instructions</code> on the default route
+and on <code>messages</code> on the OpenAI route, because
+<code>lms_chat()</code> fills those fields itself. A misspelled name
+such as <code>temprature</code> goes to the server with no check by the
+package.</p>
+<p>The server checks the names, and the routes do not check them in the
+same way. On the default route, the server ignores a name that it does
+not know. The call below misspells <code>temperature</code>, and it
+still returns a reply with no error.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># &quot;temprature&quot; is not an option that the server knows</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt, <span class="at">temprature =</span> <span class="dv">0</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_e9fa3986708ece2925883ed9f7e59999867016bfe21ca658&quot;</span></span></code></pre></div>
+<p>So a misspelled option can go unnoticed. A later section shows how to
+see the temperature that the server used. The last section shows what
+the native route does with the same call.</p>
+</div>
+<div id="a-follow-up-question" class="section level2">
+<h2>A follow-up question</h2>
+<p>On the default route and the native route, the text of a reply
+carries its response id in the <code>response_id</code> attribute. Pass
+the reply itself as <code>previous_response_id</code> in your next call.
+The package sends the id from the attribute, and the server sends the
+earlier prompt and reply to the model with your new prompt. The id
+string from <code>attr(first, &quot;response_id&quot;)</code> also works.</p>
+<p>Each call below sets <code>temperature = 0</code>, as in the section
+“Request options”.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Tell the model a fact</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>first <span class="ot">&lt;-</span> <span class="fu">lms_chat</span>(</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>  model,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>  <span class="st">&quot;My favorite color is green. Reply with OK.&quot;</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>  <span class="at">temperature =</span> <span class="dv">0</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>)</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>first</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; [1] &quot;OK.&quot;</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_342a9e50660c1e6ca25912df33559f6f0c9520f5a5012d3b&quot;</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co"># Ask about the fact in a follow-up</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="fu">lms_chat</span>(</span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>  model,</span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a>  <span class="st">&quot;What is my favorite color? Answer with one word.&quot;</span>,</span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a>  <span class="at">previous_response_id =</span> first,</span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a>  <span class="at">temperature =</span> <span class="dv">0</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a>)</span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Green.&quot;</span></span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_f9f176cf59816d6b3f8c602dfcb91df493e0338c7d8b01ea&quot;</span></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a></span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co"># Ask the same question with no response id</span></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="fu">lms_chat</span>(</span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a>  model,</span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a>  <span class="st">&quot;What is my favorite color? Answer with one word.&quot;</span>,</span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a>  <span class="at">temperature =</span> <span class="dv">0</span></span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a>)</span>
+<span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
+<span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_91e29038937144cf4478592485332f092e67d5cf7a5c997d&quot;</span></span></code></pre></div>
+<p>With the first reply as <code>previous_response_id</code>, the model
+answered from the first prompt. With no response id, the model did not
+see the first prompt, and its answer was a guess.</p>
+<p>The OpenAI route has no response id. With
+<code>api_type = &quot;openai&quot;</code>, <code>lms_chat()</code> stops with an
+error if you give <code>previous_response_id</code>.</p>
+</div>
+<div id="a-whole-conversation" class="section level2">
+<h2>A whole conversation</h2>
+<p>Conversation history is the list of the earlier messages of a chat.
+On the OpenAI route, a reply has no response id, so you send the whole
+history with each request. <code>lms_chat()</code> with
+<code>api_type = &quot;openai&quot;</code> sends a history of two messages at
+most: the system prompt, which is a set of instructions for the model,
+and your prompt. To send a longer history, call
+<code>lms_chat_openai()</code>, the function behind that route. It takes
+the history in its <code>messages</code> argument, as a data frame with
+one row for each message. The <code>role</code> column says who wrote
+the message, and the <code>content</code> column holds the text. The
+roles are:</p>
+<ul>
+<li><code>system</code>, for the system prompt.</li>
+<li><code>user</code>, for your prompts.</li>
+<li><code>assistant</code>, for the replies of the model.</li>
+</ul>
+<p>You write the history yourself, so an <code>assistant</code> row can
+hold a reply that the model never gave.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>history <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="at">role =</span> <span class="fu">c</span>(<span class="st">&quot;system&quot;</span>, <span class="st">&quot;user&quot;</span>, <span class="st">&quot;assistant&quot;</span>, <span class="st">&quot;user&quot;</span>),</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>  <span class="at">content =</span> <span class="fu">c</span>(</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a>    <span class="st">&quot;You answer in one short sentence.&quot;</span>,</span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>    <span class="st">&quot;My favorite color is green.&quot;</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>    <span class="st">&quot;Green is a nice color.&quot;</span>,</span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>    <span class="st">&quot;What is my favorite color?&quot;</span></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a>  )</span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a>)</span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a>history</span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co">#&gt;        role                           content</span></span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt; 1    system You answer in one short sentence.</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt; 2      user       My favorite color is green.</span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt; 3 assistant            Green is a nice color.</span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt; 4      user        What is my favorite color?</span></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co"># Send the whole conversation</span></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a>reply <span class="ot">&lt;-</span> <span class="fu">lms_chat_openai</span>(model, <span class="at">messages =</span> history, <span class="at">temperature =</span> <span class="dv">0</span>)</span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a>reply</span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Your favorite color is green.&quot;</span></span></code></pre></div>
+<p>To continue the conversation, add the reply and your next prompt to
+the data frame as new rows, and send it again. A reply can start or end
+with spaces or line breaks, and <code>trimws()</code> removes them.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Add the reply and a new prompt as two rows</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>history <span class="ot">&lt;-</span> <span class="fu">rbind</span>(</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a>  history,</span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a>  <span class="fu">data.frame</span>(</span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>    <span class="at">role =</span> <span class="fu">c</span>(<span class="st">&quot;assistant&quot;</span>, <span class="st">&quot;user&quot;</span>),</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>    <span class="at">content =</span> <span class="fu">c</span>(<span class="fu">trimws</span>(reply), <span class="st">&quot;Write my favorite color in capital letters.&quot;</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>  )</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a>)</span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co"># Send the longer conversation</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="fu">lms_chat_openai</span>(model, <span class="at">messages =</span> history, <span class="at">temperature =</span> <span class="dv">0</span>)</span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt; [1] &quot;GREEN!&quot;</span></span></code></pre></div>
+<p>The new prompt does not name the color, so the model read it from the
+history.</p>
+</div>
+<div id="the-raw-reply" class="section level2">
+<h2>The raw reply</h2>
+<p>The server sends its reply in JSON, a text format for data. The raw
+reply is that whole reply, read into R as a list, with one element for
+each field. With <code>simplify = FALSE</code>, <code>lms_chat()</code>
+returns the raw reply in place of the text. The fields differ from route
+to route. On the default route, the text of the reply is inside the
+<code>output</code> field.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>raw <span class="ot">&lt;-</span> <span class="fu">lms_chat</span>(model, prompt, <span class="at">temperature =</span> <span class="dv">0</span>, <span class="at">simplify =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="co"># The fields of the raw reply</span></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="fu">names</span>(raw)</span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="co">#&gt;  [1] &quot;id&quot;                   &quot;object&quot;               &quot;created_at&quot;          </span></span>
+<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="co">#&gt;  [4] &quot;completed_at&quot;         &quot;status&quot;               &quot;incomplete_details&quot;  </span></span>
+<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="co">#&gt;  [7] &quot;model&quot;                &quot;previous_response_id&quot; &quot;instructions&quot;        </span></span>
+<span id="cb8-8"><a href="#cb8-8" tabindex="-1"></a><span class="co">#&gt; [10] &quot;output&quot;               &quot;error&quot;                &quot;tools&quot;               </span></span>
+<span id="cb8-9"><a href="#cb8-9" tabindex="-1"></a><span class="co">#&gt; [13] &quot;tool_choice&quot;          &quot;truncation&quot;           &quot;parallel_tool_calls&quot; </span></span>
+<span id="cb8-10"><a href="#cb8-10" tabindex="-1"></a><span class="co">#&gt; [16] &quot;text&quot;                 &quot;top_p&quot;                &quot;presence_penalty&quot;    </span></span>
+<span id="cb8-11"><a href="#cb8-11" tabindex="-1"></a><span class="co">#&gt; [19] &quot;frequency_penalty&quot;    &quot;top_logprobs&quot;         &quot;temperature&quot;         </span></span>
+<span id="cb8-12"><a href="#cb8-12" tabindex="-1"></a><span class="co">#&gt; [22] &quot;reasoning&quot;            &quot;usage&quot;                &quot;max_output_tokens&quot;   </span></span>
+<span id="cb8-13"><a href="#cb8-13" tabindex="-1"></a><span class="co">#&gt; [25] &quot;max_tool_calls&quot;       &quot;store&quot;                &quot;background&quot;          </span></span>
+<span id="cb8-14"><a href="#cb8-14" tabindex="-1"></a><span class="co">#&gt; [28] &quot;service_tier&quot;         &quot;metadata&quot;             &quot;safety_identifier&quot;   </span></span>
+<span id="cb8-15"><a href="#cb8-15" tabindex="-1"></a><span class="co">#&gt; [31] &quot;prompt_cache_key&quot;</span></span>
+<span id="cb8-16"><a href="#cb8-16" tabindex="-1"></a></span>
+<span id="cb8-17"><a href="#cb8-17" tabindex="-1"></a><span class="co"># The temperature that the server used</span></span>
+<span id="cb8-18"><a href="#cb8-18" tabindex="-1"></a>raw<span class="sc">$</span>temperature</span>
+<span id="cb8-19"><a href="#cb8-19" tabindex="-1"></a><span class="co">#&gt; [1] 0</span></span></code></pre></div>
+<p>The raw reply holds more than the text, such as the
+<code>temperature</code> that the server used. Here is the call with the
+misspelled option from the section “Request options”.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a>raw_typo <span class="ot">&lt;-</span> <span class="fu">lms_chat</span>(model, prompt, <span class="at">temprature =</span> <span class="dv">0</span>, <span class="at">simplify =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co"># The temperature that the server used</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a>raw_typo<span class="sc">$</span>temperature</span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; [1] 0.8</span></span></code></pre></div>
+<p>The server did not use a temperature of 0. It ignored
+<code>temprature</code> and used a temperature that the call did not
+set.</p>
+</div>
+<div id="errors-in-a-script" class="section level2">
+<h2>Errors in a script</h2>
+<p>When a call fails, R creates a condition, an object that describes
+the error. A condition class is a name that says what kind of error a
+condition is. <code>tryCatch()</code> can run different code for each
+condition class.</p>
+<p>Two more terms come up in these errors. The <code>host</code>
+argument of each chat function is the address of the server. Its
+default, <code>&quot;http://localhost:1234&quot;</code>, is port 1234 of your own
+computer. A port is a number that picks one program on a computer. With
+each reply, the server also sends an HTTP status, a number that says how
+the request went. A status of 400 or more is an error. 404 says that the
+server did not find what the request named, and 400 says that the
+request was wrong in another way.</p>
+<p>The package uses these classes for a failed chat:</p>
+<ul>
+<li><code>rlmstudio_no_server</code>: no server answers at the address
+in <code>host</code>.</li>
+<li><code>rlmstudio_api_error</code>: the server answered with an error.
+The <code>status</code> field of the condition holds the HTTP status.
+Its <code>code</code> field holds the error code that the server gave,
+or <code>NULL</code> if the server gave none.</li>
+<li><code>rlmstudio_bad_response</code>: the server answered, but the
+package could not read the reply, for example a reply that is not
+JSON.</li>
+<li><code>rlmstudio_model_mismatch</code>: on the default route and the
+OpenAI route, the reply came from a model other than the one that you
+asked for. The <code>model</code> field holds the model that you asked
+for, and the <code>reply_model</code> field holds the model that
+answered. This class is also <code>rlmstudio_bad_response</code>.</li>
+</ul>
+<p>The function below calls <code>lms_chat()</code>. If the call works,
+the function returns the reply. If the call fails with one of these
+classes, the function prints a message and returns <code>NA</code>. A
+handler is a function that <code>tryCatch()</code> runs for one
+condition class. <code>tryCatch()</code> runs the first handler whose
+class matches, so the handler for <code>rlmstudio_model_mismatch</code>
+comes before the handler for <code>rlmstudio_bad_response</code>.</p>
+<p>In a loop over many prompts, such a function keeps a failed call of
+these classes from stopping the loop. Other errors still stop it. For
+example, the package stops on a wrong argument before it sends the
+request, and that error has none of these classes. A server that stops
+during a request raises an error of the class
+<code>httr2_failure</code>, which also stops the loop.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># Chat, and return NA with a message if the call fails</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a>chat_or_na <span class="ot">&lt;-</span> <span class="cf">function</span>(...) {</span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>  <span class="fu">tryCatch</span>(</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>    <span class="fu">lms_chat</span>(...),</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>    <span class="at">rlmstudio_no_server =</span> <span class="cf">function</span>(cnd) {</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>      <span class="fu">message</span>(<span class="st">&quot;No server answered.&quot;</span>)</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>      <span class="cn">NA_character_</span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>    },</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>    <span class="at">rlmstudio_api_error =</span> <span class="cf">function</span>(cnd) {</span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>      <span class="fu">message</span>(<span class="st">&quot;The server refused the call: status &quot;</span>, cnd<span class="sc">$</span>status, <span class="st">&quot;.&quot;</span>)</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>      <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.null</span>(cnd<span class="sc">$</span>code)) {</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>        <span class="fu">message</span>(<span class="st">&quot;The error code is &quot;</span>, cnd<span class="sc">$</span>code, <span class="st">&quot;.&quot;</span>)</span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>      }</span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a>      <span class="cn">NA_character_</span></span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a>    },</span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>    <span class="at">rlmstudio_model_mismatch =</span> <span class="cf">function</span>(cnd) {</span>
+<span id="cb10-17"><a href="#cb10-17" tabindex="-1"></a>      <span class="fu">message</span>(<span class="st">&quot;The reply came from &quot;</span>, cnd<span class="sc">$</span>reply_model,</span>
+<span id="cb10-18"><a href="#cb10-18" tabindex="-1"></a>              <span class="st">&quot;, not from &quot;</span>, cnd<span class="sc">$</span>model, <span class="st">&quot;.&quot;</span>)</span>
+<span id="cb10-19"><a href="#cb10-19" tabindex="-1"></a>      <span class="cn">NA_character_</span></span>
+<span id="cb10-20"><a href="#cb10-20" tabindex="-1"></a>    },</span>
+<span id="cb10-21"><a href="#cb10-21" tabindex="-1"></a>    <span class="at">rlmstudio_bad_response =</span> <span class="cf">function</span>(cnd) {</span>
+<span id="cb10-22"><a href="#cb10-22" tabindex="-1"></a>      <span class="fu">message</span>(<span class="st">&quot;The reply could not be read.&quot;</span>)</span>
+<span id="cb10-23"><a href="#cb10-23" tabindex="-1"></a>      <span class="cn">NA_character_</span></span>
+<span id="cb10-24"><a href="#cb10-24" tabindex="-1"></a>    }</span>
+<span id="cb10-25"><a href="#cb10-25" tabindex="-1"></a>  )</span>
+<span id="cb10-26"><a href="#cb10-26" tabindex="-1"></a>}</span>
+<span id="cb10-27"><a href="#cb10-27" tabindex="-1"></a></span>
+<span id="cb10-28"><a href="#cb10-28" tabindex="-1"></a><span class="co"># A call that works returns the reply</span></span>
+<span id="cb10-29"><a href="#cb10-29" tabindex="-1"></a><span class="fu">chat_or_na</span>(model, prompt, <span class="at">temperature =</span> <span class="dv">0</span>)</span>
+<span id="cb10-30"><a href="#cb10-30" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
+<span id="cb10-31"><a href="#cb10-31" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
+<span id="cb10-32"><a href="#cb10-32" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_220281674e43b24eb1d488881bae74895a8bd66ea524b3c3&quot;</span></span></code></pre></div>
+<p>The first call below goes to port 1, where no server runs. The other
+calls misspell the model name or an option.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># No server listens at this address</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">chat_or_na</span>(model, prompt, <span class="at">host =</span> <span class="st">&quot;http://localhost:1&quot;</span>)</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a><span class="co">#&gt; No server answered.</span></span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a><span class="co">#&gt; [1] NA</span></span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a></span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a><span class="co"># A misspelled model name on the native route</span></span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a><span class="fu">chat_or_na</span>(<span class="st">&quot;google/gemma-3-1bb&quot;</span>, prompt, <span class="at">api_type =</span> <span class="st">&quot;native&quot;</span>)</span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a><span class="co">#&gt; The server refused the call: status 404.</span></span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="co">#&gt; The error code is model_not_found.</span></span>
+<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a><span class="co">#&gt; [1] NA</span></span>
+<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a></span>
+<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="co"># The same misspelled model name on the default route</span></span>
+<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="fu">chat_or_na</span>(<span class="st">&quot;google/gemma-3-1bb&quot;</span>, prompt)</span>
+<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="co">#&gt; The reply came from google/gemma-3-1b, not from google/gemma-3-1bb.</span></span>
+<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="co">#&gt; [1] NA</span></span>
+<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a></span>
+<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="co"># A misspelled option on the native route</span></span>
+<span id="cb11-18"><a href="#cb11-18" tabindex="-1"></a><span class="fu">chat_or_na</span>(model, prompt, <span class="at">api_type =</span> <span class="st">&quot;native&quot;</span>, <span class="at">temprature =</span> <span class="dv">0</span>)</span>
+<span id="cb11-19"><a href="#cb11-19" tabindex="-1"></a><span class="co">#&gt; The server refused the call: status 400.</span></span>
+<span id="cb11-20"><a href="#cb11-20" tabindex="-1"></a><span class="co">#&gt; The error code is unrecognized_keys.</span></span>
+<span id="cb11-21"><a href="#cb11-21" tabindex="-1"></a><span class="co">#&gt; [1] NA</span></span></code></pre></div>
+<p>The native route refused the misspelled model name and the misspelled
+option. The code <code>unrecognized_keys</code> says that the request
+held a field name that the server does not know.</p>
+<p>On the default route, with one model loaded as here, the server did
+not refuse the misspelled model name. It answered with the model that
+was loaded, and the package raised <code>rlmstudio_model_mismatch</code>
+when it read the reply.</p>
+</div>
+<div id="clean-up" class="section level2">
+<h2>Clean up</h2>
+<p>When you are done, unload the model to free its memory, and stop the
+server. <code>lms_server_stop()</code> stops the server even if it ran
+before this vignette.</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># Remove the model from memory</span></span>
+<span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">lms_unload</span>(model)</span>
+<span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">#&gt; ℹ Unloading model: &quot;google/gemma-3-1b&quot;...</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; unloaded successfully. [525ms]</span></span>
+<span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a></span>
+<span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="co"># Stop the local server</span></span>
+<span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="fu">lms_server_stop</span>()</span>
+<span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server stopped successfully.</span></span></code></pre></div>
+<!-- Knitted from chat-options.Rmd.orig with MD5 2a8ae2a16e437bfa1779916f7fd57fd6. -->
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

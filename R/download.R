@@ -2,17 +2,33 @@
 #'
 #' @param model Character. The model to download. Accepts model catalog
 #'   identifiers (e.g., "openai/gpt-oss-20b") and exact Hugging Face links.
+#'   Must be one name, given as a single string. The string must be valid in
+#'   its declared encoding and not marked `"bytes"`. A class, names, and the
+#'   S4 bit are removed before the name is sent.
 #' @param quantization Character. Optional. Quantization level of the model to
 #'   download (e.g., "Q4_K_M"). Only supported for Hugging Face links.
 #' @param host Character. The host address of the local server. Defaults to
 #'   "http://localhost:1234".
+#' @param token Character or `NULL`. An API token for a server that requires
+#'   authentication. `NULL` reads the `rlmstudio.token` option and then the
+#'   `RLMSTUDIO_API_TOKEN` environment variable. See [rlmstudio_token].
 #' @param ... Additional arguments passed to the request.
 #'
 #' @seealso [LM Studio Download Model
 #'   API](https://lmstudio.ai/docs/developer/rest/download)
 #'
 #' @return A character string containing the download \code{job_id}, or
-#'   \code{"already_downloaded"} if already downloaded.
+#'   \code{"already_downloaded"}, invisibly, if the model is already
+#'   downloaded. The call aborts with \code{rlmstudio_bad_response} when the
+#'   reply's \code{status} is \code{"failed"}. It also aborts when the status
+#'   is not \code{"already_downloaded"} and the reply holds no \code{job_id}
+#'   string with a character that is not whitespace. It also aborts when the
+#'   reply is not a JSON object whose \code{status} is a string.
+#'
+#' @inheritSection rlmstudio-conditions Server not running
+#' @inheritSection rlmstudio-conditions API failure
+#' @inheritSection rlmstudio-conditions Malformed response
+#' @inheritSection rlmstudio-conditions Malformed load or download reply
 #'
 #' @export
 #'
@@ -30,18 +46,12 @@ lms_download <- function(
   model,
   quantization = NULL,
   host = "http://localhost:1234",
-  ...
+  ...,
+  token = NULL
 ) {
-  if (!is_server_running()) {
-    cli::cli_alert_danger(
-      "The LM Studio server is not running. Run {.fn lms_server_start} first."
-    )
-    return(invisible(NULL))
-  }
+  model <- rlm_check_id(model, "model")
 
-  if (is.null(model) || model == "") {
-    cli::cli_abort("You must provide a valid model identifier or URL.")
-  }
+  stop_if_no_server(host)
 
   body <- list(
     model = model,
@@ -57,68 +67,124 @@ lms_download <- function(
     "Initiating download for model: {.val {model}}..."
   )
 
-  resp <- lms_client(host) |>
+  req <- lms_client(host, token = token) |>
     httr2::req_url_path("api/v1/models/download") |>
-    httr2::req_body_json(body) |>
-    httr2::req_error(is_error = \(resp) FALSE) |>
-    httr2::req_perform()
+    rlm_req_body(body) |>
+    httr2::req_error(is_error = \(resp) FALSE)
+  resp <- httr2::req_perform(req)
 
   # Explicitly complete the progress step before printing subsequent alerts
   rlm_progress_done(step_id)
 
   if (httr2::resp_status(resp) == 200) {
-    resp_data <- httr2::resp_body_json(resp)
+    resp_data <- parse_ok_body(resp, "API Download Failed")
+    fault <- download_reply_fault(resp_data)
+    if (!is.null(fault)) {
+      rlm_abort_bad_reply(resp, "API Download Failed", fault, "a download reply")
+    }
 
-    if (
-      !is.null(resp_data$status) && resp_data$status == "already_downloaded"
-    ) {
+    if (identical(resp_data[["status"]], "already_downloaded")) {
       rlm_alert_success("Model {.val {model}} is already downloaded.")
       return(invisible("already_downloaded"))
     }
 
-    if (!is.null(resp_data$job_id)) {
-      rlm_alert_success(
-        "Download job started successfully. Job ID: {.val {resp_data$job_id}}"
-      )
-      return(resp_data$job_id)
+    if (identical(resp_data[["status"]], "failed")) {
+      rlm_abort_download_failed(resp, resp_data[["job_id"]])
     }
 
-    rlm_alert_success("Download request succeeded.")
-    return(invisible(TRUE))
+    job_id <- resp_data[["job_id"]]
+    rlm_alert_success(
+      "Download job started successfully. Job ID: {.val {job_id}}"
+    )
+    return(job_id)
   }
 
-  err_msg <- tryCatch(
-    {
-      err_json <- httr2::resp_body_json(resp)
-      if (!is.null(err_json$error$message)) {
-        err_json$error$message
-      } else if (!is.null(err_json$error)) {
-        err_json$error
-      } else {
-        httr2::resp_body_string(resp)
-      }
-    },
-    error = function(e) httr2::resp_body_string(resp)
+  rlm_abort_api(resp, "API Download Failed", request_sends_token(req))
+}
+
+#' Find the first way a download reply breaks its shape rules
+#'
+#' The body is a JSON object whose `status` is a string. A status of
+#' `"already_downloaded"` or `"failed"` passes with any `job_id`, and
+#' `lms_download()` handles each of them itself. For any other status, the
+#' `job_id` is a string with a character that is not whitespace. Apart from
+#' those two values, the rules check types and not status values, so a status
+#' that a later LM Studio adds still passes (D-017, narrowed by D-018). Fields
+#' are read by exact name.
+#'
+#' @param body The body, parsed with `simplifyVector = FALSE`.
+#' @return `NULL` when the body passes, or one clause naming the fault.
+#'
+#' @noRd
+download_reply_fault <- function(body) {
+  if (!is_json_object(body)) {
+    return("the response body is not a JSON object.")
+  }
+  if (!is_json_string(body[["status"]])) {
+    return("`status` is not a string.")
+  }
+  if (body[["status"]] %in% c("already_downloaded", "failed")) {
+    return(NULL)
+  }
+  job_id <- body[["job_id"]]
+  if (!is_json_string(job_id)) {
+    return("`job_id` is not a string.")
+  }
+  if (!grepl("[^[:space:]]", job_id)) {
+    return("`job_id` is a string with no character that is not whitespace.")
+  }
+  NULL
+}
+
+#' Abort on a download reply whose status is "failed"
+#'
+#' The reply is well formed, so the hint of `rlm_abort_bad_reply()` about
+#' another program on the host does not apply. The condition class is still
+#' `rlmstudio_bad_response`, as for a load reply that is not `"loaded"`
+#' (D-018). The job id is named only when it is a string with a character
+#' that is not whitespace. It is spliced in as a value, so cli does not run
+#' its braces.
+#'
+#' @param resp The httr2 response, with status 200.
+#' @param job_id The reply's `job_id` field, of any type, or `NULL`.
+#' @return Never returns. Always aborts.
+#'
+#' @noRd
+rlm_abort_download_failed <- function(resp, job_id) {
+  detail <- "LM Studio reports that the download failed."
+  if (is_json_string(job_id) && grepl("[^[:space:]]", job_id)) {
+    detail <- paste0(detail, " Job ID: ", encodeString(job_id, quote = '"'), ".")
+  }
+  rlm_abort_bad_response(
+    resp,
+    "API Download Failed",
+    detail,
+    hint = "The reply does not say why the download failed."
   )
-
-  if (err_msg == "") {
-    err_msg <- paste("HTTP Status", httr2::resp_status(resp))
-  }
-
-  cli::cli_abort(c("x" = "API Download Failed: {err_msg}"))
 }
 
 #' Get the status of a download job
 #'
-#' @param job_id Character. The unique identifier for the download job.
+#' @param job_id Character. The unique identifier for the download job. Must be
+#'   one id, given as a single string. The string must be valid in its declared
+#'   encoding and not marked `"bytes"`. A class, names, and the S4 bit are
+#'   removed before the id is sent.
 #' @param host Character. The host address of the local server. Defaults to
 #'   "http://localhost:1234".
+#' @param token Character or `NULL`. An API token for a server that requires
+#'   authentication. `NULL` reads the `rlmstudio.token` option and then the
+#'   `RLMSTUDIO_API_TOKEN` environment variable. See [rlmstudio_token].
 #'
 #' @seealso [LM Studio Download Status
 #'   API](https://lmstudio.ai/docs/developer/rest/download-status)
 #'
 #' @return An object of class \code{lms_download_status} containing the download
 #'   status.
+#'
+#' @inheritSection rlmstudio-conditions Server not running
+#' @inheritSection rlmstudio-conditions API failure
+#' @inheritSection rlmstudio-conditions Malformed response
+#' @inheritSection rlmstudio-conditions Malformed load or download reply
 #'
 #' @export
 #'
@@ -130,13 +196,14 @@ lms_download <- function(
 #' status <- lms_download_status(job_id)
 #' print(status)
 #' }
-lms_download_status <- function(job_id, host = "http://localhost:1234") {
-  if (!is_server_running()) {
-    cli::cli_alert_danger(
-      "The LM Studio server is not running. Run {.fn lms_server_start} first."
-    )
-    return(invisible(NULL))
-  }
+lms_download_status <- function(
+  job_id,
+  host = "http://localhost:1234",
+  token = NULL
+) {
+  job_id <- rlm_check_id(job_id, "job_id")
+
+  stop_if_no_server(host)
 
   if (identical(job_id, "already_downloaded")) {
     out <- list(
@@ -147,40 +214,56 @@ lms_download_status <- function(job_id, host = "http://localhost:1234") {
     return(out)
   }
 
-  if (is.null(job_id) || job_id == "") {
-    cli::cli_abort("You must provide a valid job_id.")
-  }
-
-  resp <- lms_client(host) |>
+  req <- lms_client(host, token = token) |>
     httr2::req_url_path(paste0("api/v1/models/download/status/", job_id)) |>
-    httr2::req_error(is_error = \(resp) FALSE) |>
-    httr2::req_perform()
+    httr2::req_error(is_error = \(resp) FALSE)
+  resp <- httr2::req_perform(req)
 
   if (httr2::resp_status(resp) == 200) {
-    out <- httr2::resp_body_json(resp)
+    out <- parse_ok_body(resp, "API Status Request Failed")
+    fault <- download_status_fault(out)
+    if (!is.null(fault)) {
+      rlm_abort_bad_reply(
+        resp,
+        "API Status Request Failed",
+        fault,
+        "a download status"
+      )
+    }
     class(out) <- c("lms_download_status", "list")
     return(out)
   }
 
-  err_msg <- tryCatch(
-    {
-      err_json <- httr2::resp_body_json(resp)
-      if (!is.null(err_json$error$message)) {
-        err_json$error$message
-      } else if (!is.null(err_json$error)) {
-        err_json$error
-      } else {
-        httr2::resp_body_string(resp)
-      }
-    },
-    error = function(e) httr2::resp_body_string(resp)
-  )
+  rlm_abort_api(resp, "API Status Request Failed", request_sends_token(req))
+}
 
-  if (err_msg == "") {
-    err_msg <- paste("HTTP Status", httr2::resp_status(resp))
+#' Find the first way a download status breaks its shape rules
+#'
+#' The body is a JSON object whose `job_id` and `status` are strings. Its
+#' `total_size_bytes`, `downloaded_bytes`, and `bytes_per_second` are each a
+#' number, or absent, or `null`. These are the fields that
+#' `print.lms_download_status()` reads. Fields are read by exact name (D-017).
+#'
+#' @param body The body, parsed with `simplifyVector = FALSE`.
+#' @return `NULL` when the body passes, or one clause naming the fault.
+#'
+#' @noRd
+download_status_fault <- function(body) {
+  if (!is_json_object(body)) {
+    return("the response body is not a JSON object.")
   }
-
-  cli::cli_abort(c("x" = "API Status Request Failed: {err_msg}"))
+  for (field in c("job_id", "status")) {
+    if (!is_json_string(body[[field]])) {
+      return(paste0("`", field, "` is not a string."))
+    }
+  }
+  for (field in c("total_size_bytes", "downloaded_bytes", "bytes_per_second")) {
+    value <- body[[field]]
+    if (!is.null(value) && !is_json_number(value)) {
+      return(paste0("`", field, "` is not a number."))
+    }
+  }
+  NULL
 }
 
 #' Print method for LM Studio download status
@@ -201,11 +284,19 @@ lms_download_status <- function(job_id, host = "http://localhost:1234") {
 #' print(status)
 #' }
 print.lms_download_status <- function(x, ...) {
-  cli::cli_h3("Download Job: {.val {x$job_id}}")
+  # Fields are read with `[[`, which matches exact names only. `$` would read
+  # a field whose name extends the one asked for.
+  job_id <- x[["job_id"]]
+  status <- x[["status"]]
+  total <- x[["total_size_bytes"]]
+  downloaded <- x[["downloaded_bytes"]]
+  speed <- x[["bytes_per_second"]]
+
+  cli::cli_h3("Download Job: {.val {job_id}}")
 
   # Color-code the status dynamically
   status_col <- switch(
-    x$status,
+    status,
     "downloading" = cli::col_blue,
     "completed" = cli::col_green,
     "already_downloaded" = cli::col_green,
@@ -214,23 +305,65 @@ print.lms_download_status <- function(x, ...) {
     cli::col_grey
   )
 
-  cli::cli_text("{.strong Status:} ", status_col(x$status))
+  # The status is spliced in as a value. Passed as a separate argument, cli
+  # would read its braces as code to run.
+  status_text <- status_col(status)
+  cli::cli_text("{.strong Status:} {status_text}")
 
-  # Calculate and format progress
-  if (!is.null(x$total_size_bytes) && !is.null(x$downloaded_bytes)) {
-    pct <- round((x$downloaded_bytes / x$total_size_bytes) * 100, 1)
-    dl_gb <- round(x$downloaded_bytes / (1024^3), 2)
-    tot_gb <- round(x$total_size_bytes / (1024^3), 2)
-
-    cli::cli_text("{.strong Progress:} {pct}% ({dl_gb} GB / {tot_gb} GB)")
+  # Calculate and format progress. A total of 0 or below would print as NaN,
+  # Inf, or a negative percentage, and a size that is not finite has no
+  # meaningful percentage, so the line is left out for both. A downloaded size
+  # below 0 or above the total would print a percentage outside 0 to 100, so
+  # the line is left out for that too. The percentage rounds down, so a
+  # download short of its total does not print as 100%.
+  if (
+    !is.null(total) &&
+      !is.null(downloaded) &&
+      is.finite(total) &&
+      is.finite(downloaded) &&
+      total > 0 &&
+      downloaded >= 0 &&
+      downloaded <= total
+  ) {
+    pct <- floor(downloaded / total * 1000) / 10
+    dl <- format_bytes(downloaded)
+    tot <- format_bytes(total)
+    cli::cli_text("{.strong Progress:} {pct}% ({dl} / {tot})")
   }
 
   # Format speed
-  if (!is.null(x$bytes_per_second) && x$bytes_per_second > 0) {
-    spd_mb <- round(x$bytes_per_second / (1024^2), 2)
-    cli::cli_text("{.strong Speed:} {spd_mb} MB/s")
+  if (!is.null(speed) && is.finite(speed) && speed > 0) {
+    spd <- format_bytes(speed)
+    cli::cli_text("{.strong Speed:} {spd}/s")
   }
 
   # Invisible return so assignment still captures the underlying list
   invisible(x)
+}
+
+#' Format a byte count in a unit that keeps the value at 1 or more
+#'
+#' The unit is the largest of B, KB, MB, GB, and TB (base 1024) in which the
+#' value, rounded to three significant digits, is 1 or more. When no unit
+#' gives such a value, the unit is B. So 1023.9 bytes shows as `"1 KB"`, and
+#' 1023 bytes shows as `"1020 B"`. The value keeps three significant digits,
+#' so a count above 0 never shows as 0.
+#'
+#' @param bytes A finite number of 0 or more.
+#' @return One string, such as `"1.5 KB"`.
+#'
+#' @noRd
+format_bytes <- function(bytes) {
+  units <- c("B", "KB", "MB", "GB", "TB")
+  # Start at the largest unit and step down while the rounded value is below
+  # 1. The unit is picked after the rounding, so a value that rounds up to 1
+  # in a unit shows in that unit.
+  power <- length(units) - 1
+  while (power > 0 && signif(bytes / 1024^power, 3) < 1) {
+    power <- power - 1
+  }
+  # `format()` also shows three digits for a subnormal number, which
+  # `signif()` alone leaves at full length.
+  value <- format(signif(bytes / 1024^power, 3), digits = 3)
+  paste(value, units[[power + 1]])
 }

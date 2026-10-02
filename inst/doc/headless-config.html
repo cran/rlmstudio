@@ -12,7 +12,7 @@
 
 
 
-<title>Headless Configuration and Usage</title>
+<title>Using LM Studio Without the Desktop App</title>
 
 <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -337,158 +337,229 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<h1 class="title toc-ignore">Headless Configuration and Usage</h1>
+<h1 class="title toc-ignore">Using LM Studio Without the Desktop
+App</h1>
 
 
 
-<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(rlmstudio)</span>
-<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>lms_installed <span class="ot">&lt;-</span> <span class="fu">has_lms</span>()</span>
-<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a></span>
-<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a>knitr<span class="sc">::</span>opts_chunk<span class="sc">$</span><span class="fu">set</span>(</span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a>  <span class="at">collapse =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a>  <span class="at">comment =</span> <span class="st">&quot;#&gt;&quot;</span></span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a>)</span></code></pre></div>
-<p>The <code>rlmstudio</code> package provides robust support for
-running LM Studio in completely headless environments. This is ideal for
-Linux servers, Docker containers, remote cloud instances, and automated
-CI/CD pipelines where a visual desktop application is unavailable or
-inconvenient.</p>
-<p>To operate without a GUI, LM Studio relies on a background process
-called the <code>llmster</code> daemon. This vignette will walk you
-through managing the daemon, starting the local server, and fully
-automating your local LLM workflows.</p>
-<div id="setup-and-installation" class="section level2">
-<h2>Setup and Installation</h2>
-<p>If you are setting up a fresh remote server, you can use the package
-to download and install the LM Studio CLI automatically via the
-terminal. Run <code>install_lmstudio(method = &quot;headless&quot;)</code> in your
-console to execute the automated installation script.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Verify the CLI is available before proceeding</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">has_lms</span>()</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co">#&gt;  lms </span></span>
-<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#&gt; TRUE</span></span></code></pre></div>
+<p>A headless setup runs LM Studio with no desktop app and no window.
+You control it with commands only. You need a headless setup on a
+computer that has no screen, such as a Linux computer that you reach
+over a network. This vignette also covers a second case: R runs on your
+computer, and LM Studio runs on another one.</p>
+<p><code>vignette(&quot;getting-started&quot;)</code> covers the steps that are
+the same with or without the desktop app: the server, the model list,
+the download, the load, and the chat. This vignette covers only what
+differs. Read <code>getting-started</code> first, but skip its install
+step, which opens a web browser. The next section replaces it.</p>
+<div id="install-the-command-line-tool" class="section level2">
+<h2>Install the command-line tool</h2>
+<p>LM Studio comes with a command-line tool called <code>lms</code>.
+Without the desktop app, you install <code>lms</code> and the rest of LM
+Studio from the command line.
+<code>install_lmstudio(method = &quot;headless&quot;)</code> runs the LM Studio
+install script for your system. If <code>lms</code> is already
+installed, at version 0.4.0 or later, the function installs nothing.</p>
+<p>The install writes files to your computer, so the function does not
+install without your consent. In R at the console, it asks you first,
+and it installs only if you answer yes. When R runs a script with no
+console, for example with <code>Rscript</code>, R cannot ask you. There,
+the function stops with an error, unless you set the environment
+variable <code>RLMSTUDIO_ALLOW_INSTALL</code> to <code>&quot;true&quot;</code>
+before the call. An environment variable is a named setting that
+programs read when they run. In R,
+<code>Sys.setenv(RLMSTUDIO_ALLOW_INSTALL = &quot;true&quot;)</code> sets it.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="co"># Install LM Studio without the desktop app. At the console, it asks you first.</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a>rlmstudio<span class="sc">::</span><span class="fu">install_lmstudio</span>(<span class="at">method =</span> <span class="st">&quot;headless&quot;</span>)</span></code></pre></div>
+<p>After the install, restart R. Then load the package and check that R
+can find <code>lms</code>.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">library</span>(rlmstudio)</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co"># TRUE if R finds the lms tool</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">has_lms</span>()</span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co"># TRUE if the lms tool is version 0.4.0 or later</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="fu">check_lms_version</span>()</span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio CLI is using the modern architecture (0.4.0+).</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>If <code>has_lms()</code> returns <code>FALSE</code>, find the full
+path of <code>lms</code> on your computer. Then set the environment
+variable <code>RLMSTUDIO_LMS_PATH</code> to that path, and the package
+uses it.</p>
 </div>
-<div id="step-by-step-guide" class="section level2">
-<h2>Step-by-Step Guide</h2>
-<div id="start-the-background-daemon" class="section level3">
-<h3>1. Start the Background Daemon</h3>
-<p>Unlike the desktop version where opening the app initializes the
-backend engine, a headless environment requires you to start the engine
-manually. You must start the <code>llmster</code> daemon before
-attempting to load models or start the API server.</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># Start the headless engine in the background</span></span>
+<div id="start-the-daemon" class="section level2">
+<h2>Start the daemon</h2>
+<p>A daemon is a program that runs in the background, with no window.
+The LM Studio daemon is called <code>llmster</code>. When the desktop
+app is open, the app does the work of the daemon. Without the desktop
+app, start the daemon yourself, before you start the server.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># Start the LM Studio daemon in the background</span></span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">lms_daemon_start</span>()</span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio daemon started in the background.</span></span></code></pre></div>
+<p><code>lms_daemon_status()</code> returns the lines that the command
+<code>lms status</code> prints, as text. They say, for example, whether
+the server is on. Where the output tells you to run
+<code>lms server start</code> in a terminal, the R function
+<code>lms_server_start()</code> of the next section runs that command
+for you.</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># What LM Studio reports about itself</span></span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">lms_daemon_status</span>()</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Server:  OFF &quot;                                      </span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt; [2] &quot;(i) To start the server, run the following command:&quot;</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; [3] &quot;    lms server start&quot;</span></span></code></pre></div>
 </div>
-<div id="start-the-local-server" class="section level3">
-<h3>2. Start the Local Server</h3>
-<p>With the daemon running, you can now spin up the REST API server to
-accept HTTP requests.</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="co"># Start the local server on the default port</span></span>
-<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">lms_server_start</span>()</span>
-<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server started successfully on the default port.</span></span></code></pre></div>
+<div id="start-the-server" class="section level2">
+<h2>Start the server</h2>
+<p>You start the server as in <code>getting-started</code>.
+<code>lms_server_start()</code> waits until LM Studio answers, for about
+<code>wait</code> seconds. If the wait runs out, the function gives a
+warning, and your script goes on. On a computer that is slow to start
+the server, give a longer wait. Then call
+<code>lms_server_ready()</code>, which returns <code>TRUE</code> only
+when LM Studio answers.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Start the server, and wait about 60 seconds for it to answer</span></span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">lms_server_start</span>(<span class="at">wait =</span> <span class="dv">60</span>)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server started successfully on the default port.</span></span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co"># TRUE if LM Studio answers</span></span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="fu">lms_server_ready</span>()</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>If the wait runs out, or if <code>lms_server_ready()</code> returns
+<code>FALSE</code>, LM Studio did not answer. One cause is that it needs
+more time. Another is that another program holds the port. A port is a
+number that picks one program on a computer, and LM Studio uses port
+1234 by default. Another cause is that the server turned the request
+away. A server turns a request away when it requires an API token, a
+secret string that it checks with each request, and the request carries
+none. The next section shows how to send one.</p>
+<p>Now download, load, and chat with a model as
+<code>getting-started</code> shows. The calls are the same without the
+desktop app.</p>
 </div>
-<div id="finding-and-managing-models" class="section level3">
-<h3>3. Finding and Managing Models</h3>
-<p>Because you do not have the GUI’s visual search tool, you will need
-to know the Hugging Face repository or the LM Studio catalog identifier
-for the model you want to use.</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Download a model using its identifier</span></span>
-<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>job_id <span class="ot">&lt;-</span> <span class="fu">lms_download</span>(<span class="st">&quot;qwen/qwen3-4b-2507&quot;</span>)</span>
-<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt; ℹ Initiating download for model: &quot;qwen/qwen3-4b-2507&quot;...</span></span>
-<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a><span class="co">#&gt; ✔ Initiating download for model: &quot;qwen/qwen3-4b-2507&quot;... [1.1s]</span></span>
-<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;qwen/qwen3-4b-2507&quot; is already downloaded.</span></span>
-<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a><span class="fu">lms_download_status</span>(job_id)</span>
-<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt; ── Download Job: &quot;N/A&quot;</span></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; Status: already_downloaded</span></span></code></pre></div>
-<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># View all downloaded models</span></span>
-<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>models <span class="ot">&lt;-</span> <span class="fu">list_models</span>()</span>
-<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co"># Filter for unloaded text models</span></span>
-<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a>unloaded_llms <span class="ot">&lt;-</span> models <span class="sc">|&gt;</span></span>
-<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a>  <span class="fu">subset</span>(type <span class="sc">==</span> <span class="st">&quot;llm&quot;</span> <span class="sc">&amp;</span> state <span class="sc">==</span> <span class="st">&quot;unloaded&quot;</span>)</span>
-<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a>unloaded_llms</span>
-<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co">#&gt;      state type  display_name                 key architecture size_gb</span></span>
-<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co">#&gt; 1 unloaded  llm   Gemma 4 E2B  google/gemma-4-e2b       gemma4    4.11</span></span>
-<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co">#&gt; 2 unloaded  llm   Gemma 4 E4B  google/gemma-4-e4b       gemma4    5.89</span></span>
-<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co">#&gt; 3 unloaded  llm Qwen3 4B 2507  qwen/qwen3-4b-2507        qwen3    2.12</span></span>
-<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt; 4 unloaded  llm    Gemma 3 1B   google/gemma-3-1b  gemma3_text    0.72</span></span>
-<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt; 5 unloaded  llm    Gemma 3 4B   google/gemma-3-4b       gemma3    2.83</span></span>
-<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt; 6 unloaded  llm  Gemma 3n E4B google/gemma-3n-e4b      gemma3n    5.46</span></span>
-<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt; 7 unloaded  llm   Gemma 3 12B  google/gemma-3-12b       gemma3    7.51</span></span></code></pre></div>
+<div id="use-an-api-token" class="section level2">
+<h2>Use an API token</h2>
+<p>An API token works like a password for the server. A server that
+requires one turns away each request that does not carry it. If you use
+a server that someone else runs, get the token from that person. The LM
+Studio documentation on <a href="https://lmstudio.ai/docs/developer/core/authentication">authentication</a>
+shows how to turn on the token check and create tokens in the desktop
+app.</p>
+<p>The package reads the token from the environment variable
+<code>RLMSTUDIO_API_TOKEN</code>. To set it for every R session, put a
+line such as <code>RLMSTUDIO_API_TOKEN=your-token</code> in the file
+<code>.Renviron</code> in your home folder, and restart R. R reads that
+file when it starts. If the file does not exist, create it. Then each
+function that sends a request to the server sends the token with it.</p>
+<p>You can also pass a token to one call with the <code>token</code>
+argument. Every function that sends a request to the server has this
+argument. A <code>token</code> argument wins over the environment
+variable, so use it when one script talks to two servers with different
+tokens. The call below passes the token from the environment
+variable.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># Pass the token to one call</span></span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">lms_server_ready</span>(<span class="at">token =</span> <span class="fu">Sys.getenv</span>(<span class="st">&quot;RLMSTUDIO_API_TOKEN&quot;</span>))</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>Do not type the token itself into your script. An error message in R
+can repeat the line of code that failed, and the token would then show
+on screen. Read it from the environment variable, as above.</p>
+<p>If the server turns a request away, the error message says so. If you
+sent no token, the message tells you to set
+<code>RLMSTUDIO_API_TOKEN</code> or to pass <code>token</code>. If you
+sent a token, the message says that the server rejected it.</p>
+<p>When you are done for now, stop the server.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Stop the server</span></span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">lms_server_stop</span>()</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server stopped successfully.</span></span></code></pre></div>
 </div>
-<div id="loading-models" class="section level3">
-<h3>4. Loading Models</h3>
-<p>Allocate the model to your system’s memory (RAM/VRAM) so it is ready
-for inference.</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a><span class="co"># Load the model</span></span>
-<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a><span class="fu">lms_load</span>(<span class="st">&quot;google/gemma-3-1b&quot;</span>, <span class="at">flash_attention =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt; ℹ Loading model: &quot;google/gemma-3-1b&quot;...</span></span>
-<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; loaded and verified. [7.7s]</span></span>
-<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a><span class="co">#&gt; </span></span></code></pre></div>
+<div id="reach-a-server-on-another-computer" class="section level2">
+<h2>Reach a server on another computer</h2>
+<p>LM Studio can run on another computer, such as one with a large
+graphics card, while you run R on your laptop. The host is the computer
+that runs LM Studio. The <code>host</code> argument gives its address,
+such as <code>&quot;http://192.168.1.20:1234&quot;</code>. That is the network
+address of the host, then a colon and the port of the server. The
+package asks port 1234 by default. By default, <code>host</code> is
+<code>&quot;http://localhost:1234&quot;</code>, which is your own computer. The
+person who manages the host can tell you its network address.</p>
+<p>The functions that run <code>lms</code>, such as
+<code>lms_daemon_start()</code> and <code>lms_server_start()</code>, act
+on the computer where R runs. So run them in R on the host. By default,
+the server answers only requests that come from the host itself. To let
+other computers reach it, set the environment variable
+<code>LMS_SERVER_HOST</code> to <code>&quot;0.0.0.0&quot;</code> before you start
+the server. The address <code>0.0.0.0</code> means every network address
+of the host.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># On the host: let other computers reach the server</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">Sys.setenv</span>(<span class="at">LMS_SERVER_HOST =</span> <span class="st">&quot;0.0.0.0&quot;</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="fu">lms_server_start</span>(<span class="at">wait =</span> <span class="dv">60</span>)</span></code></pre></div>
+<p>Then any computer that can reach the host over the network can send
+requests to the server. If the network is not private, require an API
+token on the server. The LM Studio documentation shows how to turn on
+the token check only in the desktop app. On a host without the desktop
+app, keep the server on a private network that only computers you trust
+can reach. A firewall between the two computers can block the port.</p>
+<p>Your own computer needs the package, but not LM Studio. Pass the
+address of the host to each call with the <code>host</code> argument.
+Every function that sends a request to the server has this argument, for
+example <code>lms_load()</code>, <code>lms_chat()</code>, and
+<code>lms_unload()</code>. The package then sends your prompts to that
+computer. The model reads them there, and the replies come back to
+R.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># On your computer: the address of the host</span></span>
+<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a>host <span class="ot">&lt;-</span> <span class="st">&quot;http://192.168.1.20:1234&quot;</span></span>
+<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co"># TRUE if the server on the host answers</span></span>
+<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="fu">lms_server_ready</span>(<span class="at">host =</span> host)</span>
+<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a></span>
+<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co"># Send one prompt to the model on the host</span></span>
+<span id="cb9-8"><a href="#cb9-8" tabindex="-1"></a>reply <span class="ot">&lt;-</span> <span class="fu">lms_chat</span>(</span>
+<span id="cb9-9"><a href="#cb9-9" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;google/gemma-3-1b&quot;</span>,</span>
+<span id="cb9-10"><a href="#cb9-10" tabindex="-1"></a>  <span class="at">input =</span> <span class="st">&quot;Say hello.&quot;</span>,</span>
+<span id="cb9-11"><a href="#cb9-11" tabindex="-1"></a>  <span class="at">host =</span> host</span>
+<span id="cb9-12"><a href="#cb9-12" tabindex="-1"></a>)</span></code></pre></div>
 </div>
-<div id="chatting" class="section level3">
-<h3>5. Chatting</h3>
-<p>Interact with the model exactly as you would in a desktop
-environment.</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a>response <span class="ot">&lt;-</span> <span class="fu">lms_chat</span>(</span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="at">model =</span> <span class="st">&quot;google/gemma-3-1b&quot;</span>,</span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a>  <span class="at">input =</span> <span class="st">&quot;Provide just the str_extract() pattern to match all text after the third comma.&quot;</span>,</span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a>  <span class="at">system_prompt =</span> <span class="st">&quot;You are an expert R programmer familiar with the tidyverse.&quot;</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a>)</span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="fu">cat</span>(response)</span></code></pre></div>
-<pre><code>#&gt; ```r
-#&gt; str_extract(text, &quot;.*,(.*)&quot;)
-#&gt; ```
-#&gt; 
-#&gt; This is the most concise and correct way to extract all text *after* the third comma in a string using the tidyverse&#39;s `str_extract()` function.  It directly targets the desired pattern without requiring further refinement.</code></pre>
+<div id="run-a-script-with-the-daemon" class="section level2">
+<h2>Run a script with the daemon</h2>
+<p>A script that runs on its own, for example every night, must start
+the daemon and stop it again. <code>with_lms_daemon()</code> does both.
+It starts the daemon, runs your code, and then stops the server and the
+daemon. It stops them even if your code fails with an error. It returns
+the value of your code.</p>
+<p>Take care on a computer that other people use. At the end,
+<code>with_lms_daemon()</code> stops the server and the daemon even if
+they ran before the call, so it can stop a server that someone else
+uses. If the desktop app is open, the daemon keeps running, as the next
+section says.</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a>model <span class="ot">&lt;-</span> <span class="st">&quot;google/gemma-3-1b&quot;</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a>replies <span class="ot">&lt;-</span> <span class="fu">with_lms_daemon</span>({</span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a>  <span class="fu">lms_server_start</span>(<span class="at">wait =</span> <span class="dv">60</span>)</span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a>  <span class="fu">lms_load</span>(model)</span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a>  out <span class="ot">&lt;-</span> <span class="fu">lms_chat_batch</span>(</span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a>    <span class="at">model =</span> model,</span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a>    <span class="at">inputs =</span> <span class="fu">c</span>(<span class="st">&quot;Name a fruit.&quot;</span>, <span class="st">&quot;Name a color.&quot;</span>),</span>
+<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a>    <span class="at">system_prompt =</span> <span class="st">&quot;Answer with one word.&quot;</span></span>
+<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a>  )</span>
+<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a>  <span class="fu">lms_unload</span>(model)</span>
+<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a>  out</span>
+<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a>})</span>
+<span id="cb10-14"><a href="#cb10-14" tabindex="-1"></a></span>
+<span id="cb10-15"><a href="#cb10-15" tabindex="-1"></a><span class="co"># One reply for each prompt</span></span>
+<span id="cb10-16"><a href="#cb10-16" tabindex="-1"></a>replies</span></code></pre></div>
 </div>
-<div id="teardown-and-cleanup" class="section level3">
-<h3>6. Teardown and Cleanup</h3>
-<p>In a headless environment, managing your system resources is
-critical. When your script finishes, you should explicitly tear down the
-entire stack to free up memory and stop background processes.</p>
-<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="co"># 1. Unload the model from memory</span></span>
-<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">lms_unload</span>(<span class="st">&quot;google/gemma-3-1b&quot;</span>)</span>
-<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="co">#&gt; ℹ Unloading model: &quot;google/gemma-3-1b&quot;...</span></span>
-<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; unloaded successfully. [384ms]</span></span>
-<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a></span>
-<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="co"># 2. Stop the API server</span></span>
-<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="fu">lms_server_stop</span>()</span>
-<span id="cb10-9"><a href="#cb10-9" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server stopped successfully.</span></span>
-<span id="cb10-10"><a href="#cb10-10" tabindex="-1"></a></span>
-<span id="cb10-11"><a href="#cb10-11" tabindex="-1"></a><span class="co"># 3. Stop the background daemon</span></span>
-<span id="cb10-12"><a href="#cb10-12" tabindex="-1"></a><span class="fu">lms_daemon_stop</span>()</span>
-<span id="cb10-13"><a href="#cb10-13" tabindex="-1"></a><span class="co">#&gt; ℹ The daemon is managed by the LM Studio GUI and will remain running.</span></span></code></pre></div>
-</div>
-</div>
-<div id="bonus-pipeline-automation" class="section level2">
-<h2>Bonus: Pipeline Automation</h2>
-<p>If you are writing a script that just needs to run a quick job and
-exit, managing the daemon state manually can be tedious. The
-<code>with_lms_daemon()</code> wrapper handles the setup and guaranteed
-teardown of the background engine automatically.</p>
-<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># The daemon will start, the code will run, and the daemon will stop on exit.</span></span>
-<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>results <span class="ot">&lt;-</span> <span class="fu">with_lms_daemon</span>({</span>
-<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>  <span class="fu">lms_server_start</span>()</span>
-<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>  <span class="fu">lms_load</span>(<span class="st">&quot;google/gemma-3-1b&quot;</span>)</span>
-<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a></span>
-<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  res <span class="ot">&lt;-</span> <span class="fu">lms_chat</span>(<span class="st">&quot;google/gemma-3-1b&quot;</span>, <span class="st">&quot;Is the daemon running?&quot;</span>)</span>
-<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a></span>
-<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>  <span class="fu">lms_server_stop</span>()</span>
-<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a>  res</span>
-<span id="cb11-10"><a href="#cb11-10" tabindex="-1"></a>})</span>
-<span id="cb11-11"><a href="#cb11-11" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio daemon started in the background.</span></span>
-<span id="cb11-12"><a href="#cb11-12" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server started successfully on the default port.</span></span>
-<span id="cb11-13"><a href="#cb11-13" tabindex="-1"></a><span class="co">#&gt; ℹ Loading model: &quot;google/gemma-3-1b&quot;...</span></span>
-<span id="cb11-14"><a href="#cb11-14" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; loaded and verified. [6.9s]</span></span>
-<span id="cb11-15"><a href="#cb11-15" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb11-16"><a href="#cb11-16" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server stopped successfully.</span></span>
-<span id="cb11-17"><a href="#cb11-17" tabindex="-1"></a><span class="co">#&gt; ℹ The daemon is managed by the LM Studio GUI and will remain running.</span></span></code></pre></div>
+<div id="stop-the-daemon" class="section level2">
+<h2>Stop the daemon</h2>
+<p>When you no longer need LM Studio, stop the daemon with
+<code>lms_daemon_stop()</code>. It returns <code>TRUE</code> when the
+daemon stopped or was not running. Use <code>force = TRUE</code> to stop
+the server first.</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># Stop the server, then the daemon</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">lms_daemon_stop</span>(<span class="at">force =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>If the desktop app is open, <code>lms_daemon_stop()</code> does not
+stop the daemon. The function returns <code>FALSE</code> and prints a
+message that says so.</p>
+<!-- Knitted from headless-config.Rmd.orig with MD5 e72953945963185349e06c053fa5d998. -->
 </div>
 
 

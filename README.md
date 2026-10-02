@@ -5,15 +5,20 @@
 coverage](https://codecov.io/gh/jmgirard/rlmstudio/graph/badge.svg)](https://app.codecov.io/gh/jmgirard/rlmstudio)
 [![Lifecycle:
 experimental](https://img.shields.io/badge/lifecycle-experimental-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#experimental)
+[![CRAN
+status](https://www.r-pkg.org/badges/version/rlmstudio)](https://CRAN.R-project.org/package=rlmstudio)
+[![R-CMD-check](https://github.com/jmgirard/rlmstudio/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/jmgirard/rlmstudio/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 # rlmstudio
 
-The `rlmstudio` package provides an R interface to the [LM
-Studio](https://lmstudio.ai/) CLI and REST API. It allows you to
-download local Large Language Models (LLMs), manage server instances,
-load or unload models into memory, and generate text directly from your
-R console or scripts.
+The `rlmstudio` package lets you run local Large Language Models (LLMs)
+over many texts from R. It is built for researchers who want to score,
+label, or generate text at scale on their own machine, with no data sent
+to a third party. To do that, it provides an R interface to the [LM
+Studio](https://lmstudio.ai/) CLI and REST API: you can download models,
+manage server instances, load or unload models into memory, and generate
+text directly from your R console or scripts.
 
 ***Disclaimer:** This is an unofficial, community-maintained R package.
 It is not affiliated with, endorsed by, or maintained by the creators of
@@ -89,7 +94,7 @@ job_id <- lms_download("google/gemma-3-1b")
 lms_download_status(job_id)
 ## ── Download Job: "job_02c8a1f86e"
 ## Status: completed
-## Progress: 100% (0.72 GB / 0.72 GB)
+## Progress: 100% (737 MB / 737 MB)
 ```
 
 Once a model is downloaded and available, load it into memory.

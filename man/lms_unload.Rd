@@ -4,20 +4,27 @@
 \alias{lms_unload}
 \title{Unload a model from memory via REST API}
 \usage{
-lms_unload(model, host = "http://localhost:1234", ...)
+lms_unload(model, host = "http://localhost:1234", ..., token = NULL)
 }
 \arguments{
 \item{model}{Character. Unique identifier (\code{instance_id}) of the model
-instance to unload.}
+instance to unload. Must be one name, given as a single string. The
+string must be valid in its declared encoding and not marked \code{"bytes"}.
+A class, names, and the S4 bit are removed before the name is sent.}
 
 \item{host}{Character. The host address of the local server. Defaults to
 "http://localhost:1234".}
 
 \item{...}{Additional arguments passed to the API request body.}
+
+\item{token}{Character or \code{NULL}. An API token for a server that requires
+authentication. \code{NULL} reads the \code{rlmstudio.token} option and then the
+\code{RLMSTUDIO_API_TOKEN} environment variable. See \link{rlmstudio_token}.}
 }
 \value{
 Invisibly returns a character string representing the unloaded
-\code{instance_id} upon success.
+\code{instance_id} upon success. It is a plain string, with no class,
+names, or S4 bit.
 }
 \description{
 Unload a model from memory via REST API
@@ -31,6 +38,108 @@ instance identifiers (e.g., \code{"google/gemma-3-1b"} and
 duplicate instances, you must provide their exact \code{instance_id}, or
 use \code{lms_unload_all()} to clear everything.
 }
+\section{Server not running}{
+
+Functions that call the LM Studio REST API open a TCP connection to the
+hostname and port named in \code{host} before they send the request. A function
+that checks its own arguments does that first, so a bad \code{model}, \code{job_id},
+\code{input}, \code{inputs}, \code{messages}, \code{schema}, \code{ttl}, \code{previous_response_id},
+or \code{batch_size}, a bad
+\code{type} of \code{\link[=list_models]{list_models()}} or \code{\link[=list_instances]{list_instances()}}, a bad \code{TRUE} or \code{FALSE}
+argument such as \code{simplify}, \code{logprobs}, \code{quiet}, \code{force}, or \code{store}, a
+\code{store} on the \code{"openai"} route of \code{\link[=lms_chat]{lms_chat()}} or \code{\link[=lms_chat_batch]{lms_chat_batch()}}, a
+\code{stream} in
+the \code{...} of a chat function, a \code{logprobs} in the \code{...} of
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} or \code{\link[=lms_chat_native]{lms_chat_native()}}, a value in the \code{...} of
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} that \code{\link[=lms_chat]{lms_chat()}} reads as an argument already given,
+an \code{instructions} or \code{messages} in the \code{...} of \code{\link[=lms_chat]{lms_chat()}} or
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} on the route where \code{\link[=lms_chat]{lms_chat()}} sets it, or a name, id,
+or \code{type} string that is not valid in its encoding or is marked as bytes,
+aborts
+with an argument message and no condition class even when the server is
+down. A condition of class
+\code{rlmstudio_no_server} is raised when that connection cannot be opened. A
+refused connection raises it. So do an address the package cannot parse and
+a hostname that does not resolve. An address that neither accepts nor
+refuses the connection also raises it. That case waits for the operating
+system to give up, which can take a minute. Start the server with
+\code{\link[=lms_server_start]{lms_server_start()}}, or give \code{host} the address that your server listens
+on.
+
+The check reads the port and nothing else. Any process holding that port
+accepts the connection, so the condition is not raised even though no LM
+Studio server is there. The call then does not raise
+\code{rlmstudio_no_server}, and what it does depends on what answers. On a
+status-200 body that does not parse as JSON, the chat functions,
+\code{\link[=lms_embed]{lms_embed()}}, \code{\link[=list_models]{list_models()}}, \code{\link[=list_instances]{list_instances()}}, \code{\link[=lms_load]{lms_load()}},
+\code{\link[=lms_download]{lms_download()}}, \code{\link[=lms_download_status]{lms_download_status()}}, and \code{\link[=lms_unload_all]{lms_unload_all()}} raise
+\code{rlmstudio_bad_response}. \code{\link[=lms_unload]{lms_unload()}} does not read the body, so it can
+report success. A body that parses as JSON but has another shape can
+come back unchanged with \code{simplify = FALSE}. With \code{simplify = TRUE}, the
+chat functions and \code{\link[=lms_embed]{lms_embed()}} raise \code{rlmstudio_bad_response} for it.
+\code{\link[=list_models]{list_models()}} and \code{\link[=list_instances]{list_instances()}} raise it for a model list with
+another shape, and so do \code{\link[=lms_unload_all]{lms_unload_all()}} and \code{\link[=lms_load]{lms_load()}} without
+\code{force = TRUE}, which read that list. \code{\link[=lms_chat_openai]{lms_chat_openai()}} and
+\code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}} raise it for such a model list too, with either
+setting of \code{simplify}, through the model lookup that a reply from another
+model starts. \code{\link[=lms_chat]{lms_chat()}} raises it through them. \code{\link[=lms_load]{lms_load()}},
+\code{\link[=lms_download]{lms_download()}}, and \code{\link[=lms_download_status]{lms_download_status()}} raise it for a reply of their
+own with another shape, such as \code{{}}. A process that does not answer in
+HTTP gives an \code{httr2_failure} error. Use \code{\link[=lms_server_ready]{lms_server_ready()}} for the
+stronger test: it
+asks the host for a model list and reports \code{TRUE} only for a model list
+that \code{\link[=list_models]{list_models()}} can read.
+
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} checks the server once before its first input, and
+\code{\link[=lms_chat]{lms_chat()}} checks it again for each input. If that check finds the server
+gone during the batch, the batch aborts with \code{rlmstudio_no_server}, and no
+request goes out after that. The condition then carries a \code{results} field, a list as
+long as \code{inputs}. Its elements before the lost input hold the values that
+\code{format = "list"} returns for those inputs. The element of the lost input
+and every element after it are \code{NULL}. The check before the first input
+adds no \code{results} field. A connection that fails after the check passes,
+such as a server that stops during a request, raises an \code{httr2_failure}
+error instead. That error aborts the batch and carries no \code{results} field.
+
+\code{\link[=lms_embed]{lms_embed()}} checks the server before each request, and a request carries
+at most \code{batch_size} inputs. If a check after the first request finds the
+server gone, the call aborts with \code{rlmstudio_no_server}. Once a request has
+succeeded, the condition carries a \code{results} field. With \code{simplify = TRUE},
+\code{results} is a matrix with \code{NA} in each row whose embedding did not arrive.
+With \code{simplify = FALSE}, it is a list with one element per batch, with
+\code{NULL} in the element of the request that ended the call and in every
+element after it.
+}
+
+\section{API failure}{
+
+A condition of class \code{rlmstudio_api_error} is raised when a REST call
+returns a response that the wrapper treats as a failure. The condition
+carries a \code{status} field, which holds the HTTP response status as an
+integer. It also carries a \code{code} field. The field holds the string at
+\code{error.code} of the response body, such as \code{"model_not_found"}. It is
+\code{NULL} when the body does not parse, when \code{error} is not a JSON object, or
+when its \code{code} is not one string.
+
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} aborts on it when its \code{status} is 401, 403, or 404, and
+when its \code{status} is 400 and its \code{code} is \code{"model_not_found"}. No request
+goes out after that input. The condition then carries a
+\code{results} field that follows the rule for a lost server in the "Server not
+running" section: its elements before the failed input hold the values that
+\code{format = "list"} returns for those inputs, and the element of the failed
+input and every element after it are \code{NULL}. For any other status, the
+element of the failed input holds the condition, or \code{NA} where the result
+is text, and the batch warns once and goes on. See the details of
+\code{\link[=lms_chat_batch]{lms_chat_batch()}}.
+
+\code{\link[=lms_embed]{lms_embed()}} follows the same rule for each request. A 401, 403, or 404
+aborts the call, and once a request has succeeded the condition carries a
+\code{results} field, a matrix or a list as the "Server not running" section
+describes. Any other status fails the inputs of that request alone, and
+the call warns once and goes on. If every request fails, the call aborts
+with the first condition. See the details of \code{\link[=lms_embed]{lms_embed()}}.
+}
+
 \examples{
 \dontrun{
 lms_server_start()

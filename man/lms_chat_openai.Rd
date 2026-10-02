@@ -10,31 +10,565 @@ lms_chat_openai(
   host = "http://localhost:1234",
   logprobs = FALSE,
   simplify = TRUE,
-  ...
+  ...,
+  schema = NULL,
+  ttl = NULL,
+  token = NULL
 )
 }
 \arguments{
-\item{model}{Character. The loaded model name.}
+\item{model}{Character. The loaded model name. Must be one name, given as a
+single string. The string must be valid in its declared encoding and not
+marked \code{"bytes"}. A class, names, and the S4 bit are removed before the
+name is sent.}
 
-\item{messages}{List. A structured list of role and content pairs.}
+\item{messages}{The messages to send. Give an unnamed list with one element
+per message, such as \code{list(list(role = "user", content = "Hi"))}, or a
+data frame with at least one row. A data frame is sent as one message per
+row, with one field per column. A cell that is \code{NA} is left out of its
+message. The call aborts before it checks for a
+running server if \code{messages} breaks one of these rules:
+\itemize{
+\item \code{messages} is a list or a data frame.
+\item A data frame has at least one row, and any other list has at least one
+element.
+\item A list that is not a data frame has no names. A single message not
+wrapped in a list, such as \code{list(role = "user", content = "Hi")},
+breaks this rule.
+\item Each element of such a list is a list of length one or more, and each
+of its fields has a name that is not \code{NA} and not empty. A data frame
+as an element breaks this rule.
+\item A data frame has at least one column, and no column name is \code{NA},
+empty, or repeated.
+\item No column of a data frame has a row count that differs from the row
+count of the data frame that holds it. jsonlite cannot write such a
+column. The rule reads each data-frame column, and each atomic or list
+column with no class or with the class \code{"AsIs"} alone. It reads such
+columns in the data frame and in its data-frame columns at any depth.
+The row count of a data-frame column is its own row count. The row
+count of a column with a \code{dim} attribute, such as a matrix, is the
+first extent of the \code{dim}. The row count of any other column is its
+length. So a character column of length one in a two-row data frame
+breaks this rule. The rule does not read a column with another class,
+such as a \code{Date}, a factor, or a \code{POSIXlt} time. jsonlite writes a
+\code{POSIXlt} column of length one with its one value in each message,
+and the rule below reads that value in each row. A \code{Date} or factor
+column of a wrong length breaks the last rule, unless an earlier rule
+refuses the data frame first.
+\item A data frame has no row in which every cell is \code{NA} or is a \code{NULL}
+cell of a list column. jsonlite leaves out an \code{NA} cell of another
+column and writes an \code{NA} or \code{NULL} list cell as \code{null}, so such a row
+holds no field value. A \code{list()}
+cell is sent as \verb{[]} and a \code{list(NA)} cell as \verb{[null]}, so a row with
+such a cell is sent. A column with a \code{dim} attribute of any length
+whose first extent is the row count, such as a matrix or an array,
+counts as empty in a row when each of its cells in that row is empty.
+Such a column with no cells in a row, such as a 2-by-0 matrix, is not
+empty in that row, because jsonlite writes that row of it as \verb{[]} or
+as nested empty arrays. A data-frame column counts as empty in a row
+when each of its own columns is empty in that row. So a data-frame
+column with no columns counts as empty in every row. A column that
+is neither an atomic vector nor a list, such as an environment, never
+counts as empty.
+\item \code{messages}, when it is a list and not a data frame, has no \code{dim}
+attribute, such as a matrix or an array of messages.
+\item A message that is a list has no \code{dim} attribute.
+\item No list inside a message has a \code{dim} attribute. The rule reads each
+field, each list at any depth below a field, and each cell of a list
+column. jsonlite would send such a list as nested arrays with each
+cell in an array of its own. A list column of a data frame with one,
+three, or more dimensions also breaks this rule. An atomic matrix
+field is sent as an array of arrays. A list-matrix column of any data
+frame is sent, one row of cells for each message. jsonlite does not
+unbox a value inside a list-matrix cell, at any depth in a list,
+unless \code{jsonlite::unbox()} wraps it. A data frame in a cell is sent as
+an array of objects whose values are not boxed. So a length-one
+atomic cell is sent as a one-element array, such as \verb{["a"]}, and a
+\code{NULL} cell is sent as \code{null}. For example, a row with \code{role}
+\code{"user"}, \code{content} \code{"hi"}, and the cells \code{"a"}, \code{NULL}, and
+\code{list(k = "v")} in a list-matrix column \code{tags} is sent as
+\verb{\{"role":"user","content":"hi","tags":[["a"],null,\{"k":["v"]\}]\}}.
+\item No message, and no list or data frame inside a message or inside a
+cell or column of a data frame, has a name that is \code{NA}, empty, or
+repeated. jsonlite would send an \code{NA} or empty name as a number and
+rename a repeated name \code{a} to \code{a.1}. A list with no names passes. The
+names of a list column are not checked, because they are not sent.
+The names of an atomic vector and the column names of a matrix are
+not checked, because jsonlite sends those values as arrays.
+}
+
+The error for each rule above opens with "\code{messages} must be a data
+frame or an unnamed list of messages." and shows the form of a message.
+Four more rules are checked after them. Their error opens with
+"\code{messages} holds a field value that cannot be sent as JSON." and shows
+no form:
+\itemize{
+\item No function sits inside \code{messages}: not as a field, in a list below a
+field, as a column of a data frame, or in a cell of a list column.
+jsonlite would send a function as its source text. A function with a
+class gets the error of this rule, not the error of a later one.
+\item Each value inside \code{messages}, in the places the rule above reads, is
+an atomic vector, a list, or \code{NULL}. An environment, a symbol, a
+call, a formula, an expression vector, an external pointer, or an S4
+object breaks this rule, and the error names its type. The rule reads
+the storage type, so a class set by hand on such a value does not
+hide it. jsonlite would send such a value as printed text, as \code{null},
+or as an object or array of other data, or it would fail. A \code{NULL}
+field passes and is sent as \code{null}. An S4 object whose class contains
+an atomic type, such as \code{"numeric"}, passes this rule, and jsonlite
+sends its data part without its other slots. An S4 object whose class
+contains \code{"list"} passes, and the rule reads its elements. The rule
+does not read the class of a vector or a list. A vector with a class
+set by hand, such as \code{structure(1L, class = "NULL")}, passes, and
+jsonlite writes it by that class.
+\item No number inside \code{messages} is \code{NA}, \code{NaN}, \code{Inf}, or \code{-Inf}. The
+rule reads a double or integer vector with no class or with the class
+\code{"AsIs"} alone, such as a field wrapped in \code{\link[=I]{I()}}. jsonlite would send
+such a number as the string \code{"NA"}, \code{"NaN"}, \code{"Inf"}, or \code{"-Inf"}.
+The rule reads a field,
+an element of a field, a list at any depth below a field, a cell of a
+list column or a list-matrix column, and a matrix or array column. An
+atomic column with no \code{dim} attribute, of a data frame at any depth,
+is the exception. jsonlite leaves an \code{NA}, \code{NaN}, \code{Inf}, or \code{-Inf}
+cell of such a column out of its message. There the rule refuses
+\code{Inf} and \code{-Inf} alone, and an \code{NA} or \code{NaN} cell is left out as a
+missing field. A number with another class, such as a \code{Date}, is
+written by its class, so \code{as.Date(NA)} is sent as \code{null} and
+\code{as.Date(Inf)} as \code{"Inf"}. Below a message, the rule reads the parts
+of a list whose class is neither \code{"AsIs"} nor a data frame only when
+jsonlite writes that list as it writes the list without its class,
+such as a list with the class \code{c("foo", "list")}. It does not read
+the parts of a \code{POSIXlt} value.
+\item jsonlite can write the value, with the options that the request uses.
+If it cannot, the error gives the jsonlite message. For a data frame,
+jsonlite then writes each top-level column alone, in column order, as
+a data frame with the same row count. If a column fails, the error
+names the first that fails. For a column \code{d}, the line reads
+\verb{Column "d" is the first column that jsonlite cannot write on its own.}
+A list that is not a data frame gets the jsonlite message alone. This
+rule is checked last.
+}
+
+A list that is not a data frame is sent without its class attribute, and
+each of its messages is sent without its class attribute. A class on a
+field inside a message is kept, so a field wrapped in \code{\link[=I]{I()}} is sent as an
+array. A data frame and its columns keep their classes. A kept class that
+jsonlite has no method for, such as a field with the class \code{"foo"} alone,
+breaks the last rule.
+
+The package checks the shape of \code{messages}. Of the field values, it
+refuses a function, a value that is not an atomic vector, a list, or
+\code{NULL}, a number with no class or with the class \code{"AsIs"} alone that
+jsonlite would send as a string or, in a data-frame column, would leave
+out because it is infinite, and a value that jsonlite cannot write. It
+does not check any other value of a role, the content, or another field
+of a message. The server checks them.}
 
 \item{host}{Character. Server URL.}
 
-\item{logprobs}{Logical. Whether to request logprobs (currently stubbed by LM
-Studio).}
+\item{logprobs}{\code{TRUE} or \code{FALSE}. Whether to request logprobs (currently
+stubbed by LM Studio). Any other value, \code{NULL} and \code{NA} included, aborts
+before the check for a running server.}
 
-\item{simplify}{Logical. If TRUE, parses output to text.}
+\item{simplify}{\code{TRUE} or \code{FALSE}. If \code{TRUE}, parses output to text. Any
+other value, \code{NULL} and \code{NA} included, aborts before the check for a
+running server.}
 
-\item{...}{Additional API arguments.}
+\item{...}{Additional API arguments. A \code{response_format} here cannot be
+combined with \code{schema}. This function has no \code{store} argument, so a
+\code{store} here goes into the request body unchecked, whatever its value.
+The package checks a \code{stream} here. A \code{stream} other than \code{FALSE} or
+\code{NULL} aborts before the call checks for a running server, because the
+package reads a whole reply and not a streamed one.}
+
+\item{schema}{A JSON Schema, written as a named list, that the reply must
+match, or \code{NULL} for a free text reply. It is sent as the \code{schema} field
+of a \code{response_format} of type \code{"json_schema"}, with the name
+\code{"response"} and \code{strict} set to \code{true}. A JSON array of one item must be
+written as a list, such as \code{required = list("score")}, or wrapped in
+\code{\link[=I]{I()}}. A plain vector of length one is sent as a single value, not as an
+array. An empty object nested in the schema, such as \code{properties}, is
+written \code{setNames(list(), character())}, because \code{list()} is sent as the
+empty array \verb{[]}. The package checks only that \code{schema} is a named list,
+an empty list, or \code{NULL}. The server checks the schema itself.}
+
+\item{ttl}{A whole number of seconds from 1 to \code{.Machine$integer.max}, or
+\code{NULL} to leave it out. It is how long the model stays loaded with no
+request. It has an effect only on a model that this request loads. The
+server loads a model that is not loaded yet when its just-in-time loading
+setting is on. A model that is already loaded keeps its idle time.}
+
+\item{token}{Character or \code{NULL}. An API token for a server that requires
+authentication. \code{NULL} reads the \code{rlmstudio.token} option and then the
+\code{RLMSTUDIO_API_TOKEN} environment variable. See \link{rlmstudio_token}.}
 }
 \value{
 If \code{simplify = FALSE}, returns a list representing the raw JSON
-response. Otherwise, returns a character string containing the generated
+response. A status-200 body that does not parse as JSON raises
+\code{rlmstudio_bad_response} with either setting of \code{simplify}. Otherwise,
+returns a character string containing the generated
 text. If \code{logprobs = TRUE}, it returns an \code{lms_chat_result}
 object with the log probabilities populated as \code{NULL} since they are
-currently stubbed in the LM Studio OpenAI endpoint.
+currently stubbed in the LM Studio OpenAI endpoint. With
+\code{simplify = TRUE}, reply content that is not one string, such as the
+\code{null} content of a reply that holds only a tool call, raises
+\code{rlmstudio_bad_response}.
+
+With a \code{schema}, \code{simplify = TRUE}, and \code{logprobs = FALSE}, the reply is
+parsed with \code{jsonlite::parse_json(simplifyVector = TRUE)} and the parsed
+value is returned. A JSON object becomes a named list, and an array of
+numbers becomes a vector. With \code{simplify = FALSE} or \code{logprobs = TRUE},
+the reply stays a string. With a \code{schema}, \code{simplify = TRUE}, and
+\code{logprobs = FALSE}, a reply that a length limit ended raises
+\code{rlmstudio_bad_response}, also when it parses. With \code{simplify = TRUE} in
+any other setting, such a reply whose content is one string is returned
+with a warning. See the "Cut-off reply" section.
+
+With \code{simplify = TRUE}, the reply is read from the first element of the
+\code{choices} field. No other element of \code{choices} is read. A request with
+\code{n} in \code{...} therefore returns the first choice alone, and the cut-off
+warning and abort depend on the finish reason of that choice alone. With
+\code{simplify = FALSE}, the body holds every choice.
+
+With either setting of \code{simplify}, a reply from a model other than the
+one asked for raises \code{rlmstudio_model_mismatch}. See the "Reply from
+another model" section.
 }
 \description{
 Direct interface to LM Studio's OpenAI-compatible endpoint. Uses the messages
 array format.
+}
+\section{Server not running}{
+
+Functions that call the LM Studio REST API open a TCP connection to the
+hostname and port named in \code{host} before they send the request. A function
+that checks its own arguments does that first, so a bad \code{model}, \code{job_id},
+\code{input}, \code{inputs}, \code{messages}, \code{schema}, \code{ttl}, \code{previous_response_id},
+or \code{batch_size}, a bad
+\code{type} of \code{\link[=list_models]{list_models()}} or \code{\link[=list_instances]{list_instances()}}, a bad \code{TRUE} or \code{FALSE}
+argument such as \code{simplify}, \code{logprobs}, \code{quiet}, \code{force}, or \code{store}, a
+\code{store} on the \code{"openai"} route of \code{\link[=lms_chat]{lms_chat()}} or \code{\link[=lms_chat_batch]{lms_chat_batch()}}, a
+\code{stream} in
+the \code{...} of a chat function, a \code{logprobs} in the \code{...} of
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} or \code{\link[=lms_chat_native]{lms_chat_native()}}, a value in the \code{...} of
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} that \code{\link[=lms_chat]{lms_chat()}} reads as an argument already given,
+an \code{instructions} or \code{messages} in the \code{...} of \code{\link[=lms_chat]{lms_chat()}} or
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} on the route where \code{\link[=lms_chat]{lms_chat()}} sets it, or a name, id,
+or \code{type} string that is not valid in its encoding or is marked as bytes,
+aborts
+with an argument message and no condition class even when the server is
+down. A condition of class
+\code{rlmstudio_no_server} is raised when that connection cannot be opened. A
+refused connection raises it. So do an address the package cannot parse and
+a hostname that does not resolve. An address that neither accepts nor
+refuses the connection also raises it. That case waits for the operating
+system to give up, which can take a minute. Start the server with
+\code{\link[=lms_server_start]{lms_server_start()}}, or give \code{host} the address that your server listens
+on.
+
+The check reads the port and nothing else. Any process holding that port
+accepts the connection, so the condition is not raised even though no LM
+Studio server is there. The call then does not raise
+\code{rlmstudio_no_server}, and what it does depends on what answers. On a
+status-200 body that does not parse as JSON, the chat functions,
+\code{\link[=lms_embed]{lms_embed()}}, \code{\link[=list_models]{list_models()}}, \code{\link[=list_instances]{list_instances()}}, \code{\link[=lms_load]{lms_load()}},
+\code{\link[=lms_download]{lms_download()}}, \code{\link[=lms_download_status]{lms_download_status()}}, and \code{\link[=lms_unload_all]{lms_unload_all()}} raise
+\code{rlmstudio_bad_response}. \code{\link[=lms_unload]{lms_unload()}} does not read the body, so it can
+report success. A body that parses as JSON but has another shape can
+come back unchanged with \code{simplify = FALSE}. With \code{simplify = TRUE}, the
+chat functions and \code{\link[=lms_embed]{lms_embed()}} raise \code{rlmstudio_bad_response} for it.
+\code{\link[=list_models]{list_models()}} and \code{\link[=list_instances]{list_instances()}} raise it for a model list with
+another shape, and so do \code{\link[=lms_unload_all]{lms_unload_all()}} and \code{\link[=lms_load]{lms_load()}} without
+\code{force = TRUE}, which read that list. \code{\link[=lms_chat_openai]{lms_chat_openai()}} and
+\code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}} raise it for such a model list too, with either
+setting of \code{simplify}, through the model lookup that a reply from another
+model starts. \code{\link[=lms_chat]{lms_chat()}} raises it through them. \code{\link[=lms_load]{lms_load()}},
+\code{\link[=lms_download]{lms_download()}}, and \code{\link[=lms_download_status]{lms_download_status()}} raise it for a reply of their
+own with another shape, such as \code{{}}. A process that does not answer in
+HTTP gives an \code{httr2_failure} error. Use \code{\link[=lms_server_ready]{lms_server_ready()}} for the
+stronger test: it
+asks the host for a model list and reports \code{TRUE} only for a model list
+that \code{\link[=list_models]{list_models()}} can read.
+
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} checks the server once before its first input, and
+\code{\link[=lms_chat]{lms_chat()}} checks it again for each input. If that check finds the server
+gone during the batch, the batch aborts with \code{rlmstudio_no_server}, and no
+request goes out after that. The condition then carries a \code{results} field, a list as
+long as \code{inputs}. Its elements before the lost input hold the values that
+\code{format = "list"} returns for those inputs. The element of the lost input
+and every element after it are \code{NULL}. The check before the first input
+adds no \code{results} field. A connection that fails after the check passes,
+such as a server that stops during a request, raises an \code{httr2_failure}
+error instead. That error aborts the batch and carries no \code{results} field.
+
+\code{\link[=lms_embed]{lms_embed()}} checks the server before each request, and a request carries
+at most \code{batch_size} inputs. If a check after the first request finds the
+server gone, the call aborts with \code{rlmstudio_no_server}. Once a request has
+succeeded, the condition carries a \code{results} field. With \code{simplify = TRUE},
+\code{results} is a matrix with \code{NA} in each row whose embedding did not arrive.
+With \code{simplify = FALSE}, it is a list with one element per batch, with
+\code{NULL} in the element of the request that ended the call and in every
+element after it.
+}
+
+\section{API failure}{
+
+A condition of class \code{rlmstudio_api_error} is raised when a REST call
+returns a response that the wrapper treats as a failure. The condition
+carries a \code{status} field, which holds the HTTP response status as an
+integer. It also carries a \code{code} field. The field holds the string at
+\code{error.code} of the response body, such as \code{"model_not_found"}. It is
+\code{NULL} when the body does not parse, when \code{error} is not a JSON object, or
+when its \code{code} is not one string.
+
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} aborts on it when its \code{status} is 401, 403, or 404, and
+when its \code{status} is 400 and its \code{code} is \code{"model_not_found"}. No request
+goes out after that input. The condition then carries a
+\code{results} field that follows the rule for a lost server in the "Server not
+running" section: its elements before the failed input hold the values that
+\code{format = "list"} returns for those inputs, and the element of the failed
+input and every element after it are \code{NULL}. For any other status, the
+element of the failed input holds the condition, or \code{NA} where the result
+is text, and the batch warns once and goes on. See the details of
+\code{\link[=lms_chat_batch]{lms_chat_batch()}}.
+
+\code{\link[=lms_embed]{lms_embed()}} follows the same rule for each request. A 401, 403, or 404
+aborts the call, and once a request has succeeded the condition carries a
+\code{results} field, a matrix or a list as the "Server not running" section
+describes. Any other status fails the inputs of that request alone, and
+the call warns once and goes on. If every request fails, the call aborts
+with the first condition. See the details of \code{\link[=lms_embed]{lms_embed()}}.
+}
+
+\section{Malformed response}{
+
+A condition of class \code{rlmstudio_bad_response} is raised when the server
+answers with a status the wrapper accepts and a body the wrapper cannot
+read. It is raised where a wrapper checks the body before it reshapes it,
+rather than indexing straight into whatever arrived. Eleven functions raise
+it for a body they cannot read: \code{\link[=lms_embed]{lms_embed()}}, \code{\link[=lms_chat]{lms_chat()}},
+\code{\link[=lms_chat_native]{lms_chat_native()}}, \code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}}, \code{\link[=lms_chat_openai]{lms_chat_openai()}},
+\code{\link[=list_models]{list_models()}}, \code{\link[=list_instances]{list_instances()}}, \code{\link[=lms_load]{lms_load()}}, \code{\link[=lms_download]{lms_download()}},
+\code{\link[=lms_download_status]{lms_download_status()}}, and \code{\link[=lms_unload_all]{lms_unload_all()}}. \code{\link[=lms_chat]{lms_chat()}} raises it
+through the chat function it calls. \code{\link[=lms_unload_all]{lms_unload_all()}} raises it through
+\code{\link[=list_models]{list_models()}}, and so does \code{\link[=lms_load]{lms_load()}} unless \code{force = TRUE}.
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} raises it only as \code{rlmstudio_model_mismatch}, which the
+"Reply from another model" section of \code{\link[=lms_chat_openai]{lms_chat_openai()}} describes.
+
+All eleven raise it for a status-200 body that does not parse as JSON, such
+as an HTML page from a proxy, JSON text that stops part way, or an empty
+body. In the functions that take \code{simplify}, the body is parsed before
+\code{simplify} is read, so the condition is raised whatever \code{simplify} is. The
+body is parsed by its content and not by its \code{Content-Type} header, so
+valid JSON under \code{text/plain} is read as JSON. The body is read as JSON
+text and nothing else. A body whose text is a URL or the path of a file
+does not parse, and the package does not fetch the URL or read the file.
+The message says that the body did not parse as JSON and that something
+other than LM Studio may be answering on the host. It does not hold the
+body text.
+
+The condition carries a \code{status} field, which holds the HTTP response
+status as an integer. Today the status is always 200: each of these
+functions reads the body only after a 200, and reports every other status
+as an \code{rlmstudio_api_error} instead.
+}
+
+\section{Malformed model list}{
+
+\code{\link[=list_models]{list_models()}} also raises it for a status-200 model list with the wrong
+shape. \code{\link[=lms_unload_all]{lms_unload_all()}} and \code{\link[=lms_load]{lms_load()}} without \code{force = TRUE} raise it
+through \code{\link[=list_models]{list_models()}}. \code{\link[=lms_chat_openai]{lms_chat_openai()}} and \code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}}
+apply these rules to the model list of their model lookup, as the "Reply
+from another model" section of \code{\link[=lms_chat_openai]{lms_chat_openai()}} describes. A model list
+must follow four rules. Each field is
+read by its exact name, so a field named \code{keyX} does not stand in for
+\code{key}.
+\enumerate{
+\item The body is a JSON object whose \code{models} field is an array. The array
+can be empty.
+\item Each entry of \code{models} is a JSON object. Its \code{type} and \code{key} are
+strings, and its \code{loaded_instances} is an array.
+\item The \code{size_bytes} of an entry is a number, or absent, or \code{null}. So is
+its \code{max_context_length}.
+\item Each entry of \code{loaded_instances} is a JSON object whose \code{id} is a string
+with a character that is not whitespace.
+}
+
+The rules are checked before the \code{type} and \code{loaded} filters, so an entry
+that the filters drop can still raise the condition. The message names the
+field or entry that broke a rule. \code{\link[=lms_server_ready]{lms_server_ready()}} applies the same
+rules and returns \code{FALSE} for a body that breaks one.
+
+\code{\link[=list_instances]{list_instances()}} applies the four rules too, and two more. They cover
+only an entry whose \code{type} is in its \code{type} argument and that has at least
+one loaded instance. The \code{display_name} of such an entry is a string, or
+absent, or \code{null}. The \code{config} of each of its instances is a JSON object,
+or absent, or \code{null}. \code{\link[=list_models]{list_models()}} and \code{\link[=lms_server_ready]{lms_server_ready()}} do not apply
+these two rules.
+}
+
+\section{Malformed chat reply}{
+
+\code{\link[=lms_chat_native]{lms_chat_native()}} and \code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}} raise it with
+\code{simplify = TRUE} when the reply holds no readable answer text. Both read
+the answer from the items of type \code{"message"} in the \code{output} array. They
+raise it when \code{output} is missing, empty, or not an array, or when an item
+in it is not a JSON object. They also raise it when no item has the type
+\code{"message"}, as in a reply that holds only reasoning or a tool call. The
+text of a message must be one string. For \code{\link[=lms_chat_native]{lms_chat_native()}} that is the
+\code{content} of the item. For \code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}} it is the \code{text} of
+each part of type \code{"output_text"}. For \code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}} only, the
+\code{content} of each message must be an array of JSON objects, and the
+messages together must hold at least one \code{"output_text"} part.
+
+Apart from a body that does not parse as JSON, \code{\link[=lms_chat_openai]{lms_chat_openai()}} raises
+it in four cases, all only with \code{simplify = TRUE}. The first case is a response whose \code{choices} field is
+missing, empty, or not an array, or whose first element is not a JSON
+object with a \code{message} object in it, so there is no reply to read. This
+case is raised with or without a \code{schema}, and with \code{logprobs = TRUE} as
+well. The second case is a reply that does not parse. A \code{schema} was
+given, \code{logprobs = FALSE}, and the reply content is not one string of valid
+JSON. The third case is reply content that is not one string, such as
+\code{null}, a missing \code{content} field, a number, or an array. A reply that
+holds only a tool call has \code{null} content. This case is raised without a
+\code{schema}, and with \code{logprobs = TRUE} with or without one. The fourth case
+is a cut-off reply. A \code{schema} was given, \code{logprobs = FALSE}, and the
+server reports the finish reason \code{"length"}. This case is raised also when
+the reply content parses, because a reply that stops part way can parse to
+a wrong value, such as the first digit of a longer number. In the second,
+third, and fourth cases, if the server reports the finish reason
+\code{"length"}, a length limit ended the reply. The limit is \code{max_tokens} or
+the context length of the model. The message then says so and names both.
+
+With \code{simplify = TRUE}, \code{\link[=lms_chat_native]{lms_chat_native()}}, \code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}},
+and \code{\link[=lms_chat_openai]{lms_chat_openai()}} also raise it for a body that is a bare JSON value,
+such as \code{5}, \code{"s"}, or \code{true}. The message says that the response body is
+not a JSON object. A body of \code{null} gets the message about its missing
+\code{output} or \code{choices} field instead.
+\code{\link[=lms_chat]{lms_chat()}} can raise the condition through all three chat functions.
+
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} does not abort on it, except on the subclass
+\code{rlmstudio_model_mismatch}, as the "Reply from another model" section of
+\code{\link[=lms_chat_openai]{lms_chat_openai()}} says. The element of the failed input holds the
+condition, or \code{NA} where the result is text, and the batch warns once and
+goes on. See the details of \code{\link[=lms_chat_batch]{lms_chat_batch()}}.
+
+A condition from \code{\link[=lms_chat_openai]{lms_chat_openai()}} about its reply also carries two more
+fields. A condition from the model-list lookup does not, as the "Reply from
+another model" section of \code{\link[=lms_chat_openai]{lms_chat_openai()}} says. The \code{content} field
+holds the reply content of the first choice, and the \code{finish_reason} field
+holds the finish reason of the first choice.
+Both are \code{NULL} for a response with no \code{choices}. In the third case,
+\code{content} holds the value that was read, which is \code{NULL} for \code{null} or
+missing content. For the second, third, and fourth cases, the message names the
+\code{content} field, so you can read what the model wrote without a second
+request. The other messages of the chat functions about the reply name
+\code{simplify = FALSE}, which returns the body unchanged, with one exception. A body that did not parse as JSON is
+checked before that argument is read, so its message points at the host
+instead. For such a body, the \code{content} and \code{finish_reason} fields of a
+condition from \code{\link[=lms_chat_openai]{lms_chat_openai()}} are \code{NULL}. The messages of
+\code{rlmstudio_model_mismatch} and of the model-list lookup do not name
+\code{simplify = FALSE}, because the check runs with either setting of
+\code{simplify}.
+}
+
+\section{Cut-off reply}{
+
+A warning of class \code{rlmstudio_reply_cut_off} is given when a length limit
+ended a reply that \code{\link[=lms_chat_openai]{lms_chat_openai()}} returns as text. The server reports
+this with the finish reason \code{"length"}. The limit is \code{max_tokens} or the
+context length of the model, and the reply does not say which one. The
+message names both. The warning is given with \code{simplify = TRUE} for reply
+content that is one string, in three settings: no \code{schema},
+\code{logprobs = TRUE}, and a \code{schema} with \code{logprobs = TRUE}. The call returns
+what the same reply returns without the cut-off. A \code{schema} reply with
+\code{logprobs = FALSE} raises \code{rlmstudio_bad_response} instead, as the
+"Malformed chat reply" section says. The warning and that abort read the
+finish reason of the first choice, which is the choice that the call
+reads. No other element of \code{choices} is read. With \code{simplify = FALSE}, the call
+returns the body with every choice and no warning.
+
+\code{\link[=lms_chat]{lms_chat()}} gives the warning through \code{\link[=lms_chat_openai]{lms_chat_openai()}} with
+\code{api_type = "openai"}. \code{\link[=lms_chat_batch]{lms_chat_batch()}} gives one warning of this class
+for the whole batch in place of one for each input. It names the count and
+the positions of the cut-off inputs, and each of those elements keeps its
+reply. It comes after the warning about failed inputs. A batch that aborts
+with a \code{results} field gives this warning before the abort. It names the
+cut-off inputs whose replies the \code{results} field of the abort holds. The
+native and OpenResponses routes give no such warning.
+
+The warning shows whatever \code{quiet} and the \code{rlmstudio.quiet} option say,
+because it is the only sign that an answer is not complete.
+}
+
+\section{Reply from another model}{
+
+\code{\link[=lms_chat_openai]{lms_chat_openai()}} and \code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}} read the \code{model} field
+of each status-200 reply, with either setting of \code{simplify}. On LM Studio
+0.4.25+1 with one chat model loaded, both routes answered a model name that
+the server could not find with status 200 and a reply from the loaded
+model. With two chat models loaded, they answered with status 400 and the
+\code{code} \code{"model_not_found"}, as the "API failure" section describes. The
+\code{model} field names the loaded instance that answered. Its id can differ
+from the key that the call asked for.
+
+If the \code{model} field equals the name that the call sent, the reply is
+accepted. If it differs, the call sends one request for the model list to
+\code{api/v1/models} on the same host, with the token of the call, and prints no
+message. The reply is accepted if a model whose key equals the asked name
+in any letter case has a loaded instance whose id is the \code{model} field.
+Otherwise the call aborts with a condition of class
+\code{rlmstudio_model_mismatch}. That condition is also an
+\code{rlmstudio_bad_response}, and its \code{status} is 200. Its \code{model} field holds
+the asked name, and its \code{reply_model} field holds the \code{model} field of the
+reply. The message names both. A condition from \code{\link[=lms_chat_openai]{lms_chat_openai()}} also
+carries the \code{content} and \code{finish_reason} fields, both \code{NULL}.
+
+The check runs before the reply is read, so it also runs with
+\code{logprobs = TRUE}, with a \code{schema} on \code{\link[=lms_chat_openai]{lms_chat_openai()}}, and for a reply
+with no answer text. A reply is not checked if its body is not a JSON
+object, if it has no \code{model} field, or if its \code{model} is not one string or
+holds only whitespace. A body that is not a JSON object is returned with
+\code{simplify = FALSE}, and with \code{simplify = TRUE} it raises the error that the
+"Malformed chat reply" section describes. If the instance that answered is
+unloaded before the model-list request, the call aborts, also when that
+instance belongs to the asked model.
+
+If the model-list request fails, the call raises the condition of that
+failure. The message opens with the label of the chat function, followed
+by "because the model-list lookup failed". A status other than 200 raises
+\code{rlmstudio_api_error}. A body that does not parse as JSON, or that breaks a
+rule of a model list in the "Malformed model list" section, raises
+\code{rlmstudio_bad_response}. A server that the port check before the request
+cannot reach raises \code{rlmstudio_no_server}. A condition from the lookup does
+not carry the \code{content} and \code{finish_reason} fields, also when
+\code{\link[=lms_chat_openai]{lms_chat_openai()}} raises it.
+
+\code{\link[=lms_chat]{lms_chat()}} runs the check through \code{\link[=lms_chat_openai]{lms_chat_openai()}} and
+\code{\link[=lms_chat_openresponses]{lms_chat_openresponses()}}. \code{\link[=lms_chat_native]{lms_chat_native()}} does not check the reply.
+On LM Studio 0.4.25+1, \verb{/api/v1/chat} answered a name that it could not
+find with status 404, which raises \code{rlmstudio_api_error}.
+
+\code{\link[=lms_chat_batch]{lms_chat_batch()}} aborts at the first input that raises
+\code{rlmstudio_model_mismatch}, on the \code{"openai"} and \code{"openresponses"} routes.
+It also aborts at an \code{rlmstudio_api_error} with status 400 whose \code{code} is
+\code{"model_not_found"}. No request goes out after that input. In both cases,
+the condition carries a \code{results} field that follows the rule for a lost
+server in the "Server not running" section.
+}
+
+\examples{
+\dontrun{
+lms_chat_openai(
+  model = "google/gemma-3-1b",
+  messages = list(
+    list(role = "user", content = "Rate 'Great value.' from 1 to 5.")
+  ),
+  schema = list(
+    type = "object",
+    properties = list(score = list(type = "integer")),
+    required = list("score")
+  )
+)
+}
 }

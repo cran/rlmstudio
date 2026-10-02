@@ -1,7 +1,10 @@
 #' Check if LM Studio CLI is installed
 #'
-#' @return A logical scalar: \code{TRUE} if the \code{lms} executable is found
-#'   on the system path, and \code{FALSE} otherwise.
+#' Uses the same lookup as [lms_path()]: the `RLMSTUDIO_LMS_PATH` environment
+#' variable, then the system `PATH`, then common installation directories.
+#'
+#' @return A logical scalar: \code{TRUE} if [lms_path()] finds the \code{lms}
+#'   executable, and \code{FALSE} if it aborts.
 #'
 #' @export
 #'
@@ -10,7 +13,13 @@
 #' has_lms()
 #' }
 has_lms <- function() {
-  Sys.which("lms") != ""
+  tryCatch(
+    {
+      lms_path()
+      TRUE
+    },
+    error = function(e) FALSE
+  )
 }
 
 #' Check if the installed LM Studio CLI meets the minimum requirement
@@ -19,7 +28,8 @@ has_lms <- function() {
 #'   "0.4.0".
 #'
 #' @return A logical scalar: \code{TRUE} if the LM Studio CLI version meets or
-#'   exceeds the specified \code{min_version}, and \code{FALSE} otherwise.
+#'   exceeds the specified \code{min_version}, and \code{FALSE} otherwise,
+#'   including when [lms_path()] does not find the CLI.
 #'
 #' @export
 #'
@@ -28,7 +38,8 @@ has_lms <- function() {
 #' check_lms_version("0.4.0")
 #' }
 check_lms_version <- function(min_version = "0.4.0") {
-  if (!has_lms()) {
+  path <- tryCatch(lms_path(), error = function(e) NULL)
+  if (is.null(path)) {
     cli::cli_alert_danger("LM Studio CLI is not installed.")
     return(FALSE)
   }
@@ -36,7 +47,7 @@ check_lms_version <- function(min_version = "0.4.0") {
   tryCatch(
     {
       result <- processx::run(
-        lms_path(),
+        path,
         args = "--version",
         error_on_status = FALSE
       )
@@ -90,6 +101,17 @@ check_lms_version <- function(min_version = "0.4.0") {
 #' desktop application (GUI). The "headless" method runs an automated
 #' installation script to install the \code{llmster} daemon and CLI, which is
 #' suitable for servers, containers, or users who prefer a GUI-less environment.
+#'
+#' If the headless installer exits with a status other than 0, the function
+#' aborts. The message gives the exit code and quotes the installer output,
+#' after "The installer said:". A byte that is not valid UTF-8 shows as
+#' `<xx>`, its hex value. ANSI escape codes, such as color codes, cursor
+#' codes, and terminal links, are removed, and each run of whitespace becomes
+#' one space. A text longer than 1000 characters keeps at most its last 1000
+#' characters, after "…".
+#' Any other error of the install step,
+#' such as a missing `curl`, aborts with "Headless installation failed." and
+#' the error message.
 #'
 #' @param method Character. Either "browser" (opens the GUI download page) or
 #'   "headless" (installs the \code{llmster} daemon via script).
@@ -149,7 +171,11 @@ install_lmstudio <- function(method = c("browser", "headless")) {
     os <- Sys.info()[["sysname"]]
     rlm_progress_step("Downloading and installing LM Studio CLI...")
 
-    tryCatch(
+    # The handler wraps any error of the install step, such as a missing
+    # curl, an unsupported system, or a shell that fails to start. A run
+    # that exits with a status other than 0 is checked after it, so its
+    # abort reaches the user whole.
+    res <- tryCatch(
       {
         if (os %in% c("Darwin", "Linux")) {
           if (Sys.which("curl") == "") {
@@ -181,21 +207,7 @@ install_lmstudio <- function(method = c("browser", "headless")) {
             "Automatic installation is not supported for this operating system: {.val {os}}."
           )
         }
-
-        if (res$status == 0) {
-          rlm_progress_done()
-          rlm_alert_success("LM Studio CLI installed successfully.")
-        } else {
-          cli::cli_progress_cleanup()
-          cli::cli_abort(c(
-            "x" = "Headless installation failed. Exit code: {.val {res$status}}.",
-            "i" = "CLI output: {.val {trimws(res$stdout)}}"
-          ))
-        }
-
-        rlm_alert_info(
-          "In a headless environment, remember to start the daemon using {.fn lms_daemon_start} and the server using {.fn lms_server_start} before loading models."
-        )
+        res
       },
       error = function(e) {
         cli::cli_progress_cleanup()
@@ -205,7 +217,31 @@ install_lmstudio <- function(method = c("browser", "headless")) {
         ))
       }
     )
+
+    if (res$status != 0) {
+      cli::cli_progress_cleanup()
+      # stderr_to_stdout = TRUE leaves stderr NULL, so the stdout text is
+      # quoted.
+      rlm_abort_cli_run(
+        "Headless installation failed.",
+        res,
+        label = "The installer said"
+      )
+    }
+
+    rlm_progress_done()
+    rlm_alert_success("LM Studio CLI installed successfully.")
+    rlm_alert_info(
+      "In a headless environment, remember to start the daemon using {.fn lms_daemon_start} and the server using {.fn lms_server_start} before loading models."
+    )
   }
 
   return(invisible(TRUE))
 }
+
+# A binding that a test can replace with local_mocked_bindings(), so the
+# consent rules of install_lmstudio() can be tested. In the installed,
+# byte-compiled package, a call to the base interactive() is inlined, and a
+# mock of the base function never reaches it. A call skips a binding that is
+# not a function, so the package still calls the base interactive().
+interactive <- NULL
