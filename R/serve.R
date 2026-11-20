@@ -37,7 +37,9 @@ build_args_server_start <- function(port = NULL, cors = FALSE) {
 #'
 #' @param port Numeric or `NULL`. Port to run the server on. It must be one
 #'   whole number from 1 to 65535, given as a number and not as an array or a
-#'   string. `NULL`, the default, lets LM Studio use the last used port.
+#'   string. `NULL`, the default, lets LM Studio use the last used port. The
+#'   functions that send requests ask `http://localhost:1234` by default, so
+#'   pass `port = 1234` unless you give those functions a `host`.
 #' @param cors Logical. Enable CORS support for web application development.
 #'   Must be `TRUE` or `FALSE`. Defaults to `FALSE`. Any other value, `NULL`
 #'   and `NA` included, aborts before the `lms` CLI runs.
@@ -102,17 +104,19 @@ build_args_server_start <- function(port = NULL, cors = FALSE) {
 #'
 #' @examples
 #' \dontrun{
-#' # Start server on the default port and wait for the REST API
-#' lms_server_start()
+#' # Start the server on port 1234, where the functions that send requests
+#' # look by default, and wait for the REST API
+#' lms_server_start(port = 1234)
 #'
-#' # Start server on a custom port with CORS enabled
+#' # Start the server on another port with CORS enabled. The functions
+#' # that send requests then need host = "http://localhost:8080".
 #' lms_server_start(port = 8080, cors = TRUE)
 #'
 #' # Return as soon as the CLI does, without waiting
-#' lms_server_start(wait = 0)
+#' lms_server_start(port = 1234, wait = 0)
 #'
 #' # Wait longer, and ask a host the rules above would not pick
-#' lms_server_start(wait = 60, host = "http://127.0.0.1:1234")
+#' lms_server_start(port = 1234, wait = 60, host = "http://127.0.0.1:1234")
 #' }
 lms_server_start <- function(
   port = NULL,
@@ -150,7 +154,7 @@ lms_server_start <- function(
       )
     } else {
       rlm_alert_success(
-        "LM Studio server started successfully on the default port."
+        "LM Studio server started successfully on the port that LM Studio used last."
       )
     }
   } else {
@@ -440,7 +444,7 @@ build_args_server_stop <- function() {
 #'
 #' @examples
 #' \dontrun{
-#' lms_server_start()
+#' lms_server_start(port = 1234)
 #' lms_server_stop()
 #' }
 lms_server_stop <- function() {
@@ -525,7 +529,7 @@ build_args_server_status <- function(
 #'
 #' @examples
 #' \dontrun{
-#' lms_server_start()
+#' lms_server_start(port = 1234)
 #'
 #' # Get basic status string
 #' lms_server_status()
@@ -691,39 +695,83 @@ wait_for_server <- function(host, wait, timeout = 1, pause = 0.25,
 #'
 #' @examples
 #' \dontrun{
-#' lms_server_start()
+#' lms_server_start(port = 1234)
 #'
 #' if (is_server_running(host = "http://localhost:1234")) {
 #'   message("The LM Studio server is currently active.")
 #' }
 #' }
 is_server_running <- function(host = "http://localhost:1234") {
-  if (!grepl("^[A-Za-z][A-Za-z0-9+.-]*://", host)) {
-    host <- paste0("http://", host)
-  }
-  url <- tryCatch(httr2::url_parse(host), error = function(e) NULL)
-  if (is.null(url)) {
+  address <- host_address(host)
+  if (is.null(address)) {
     return(FALSE)
   }
-  hostname <- url$hostname
-  port <- if (is.null(url$port)) 1234L else as.integer(url$port)
-
-  if (is.null(hostname) || identical(hostname, "")) {
-    return(FALSE)
-  }
-  # url_parse keeps the brackets of an IPv6 literal; socketConnection does not
-  # accept them.
-  hostname <- sub("^\\[(.*)\\]$", "\\1", hostname)
 
   tryCatch(
     {
       con <- suppressWarnings(
-        socketConnection(host = hostname, port = port, timeout = 0.5)
+        socketConnection(
+          host = address$hostname,
+          port = address$port,
+          timeout = 0.5
+        )
       )
       close(con)
       TRUE
     },
     error = function(e) FALSE
+  )
+}
+
+#' Read the hostname and port that the server probe uses
+#'
+#' A `host` with no scheme is read as `http://`. When `host` names no port,
+#' the port is 1234, the LM Studio default. The brackets of an IPv6 literal
+#' are removed, because `socketConnection()` does not accept them.
+#'
+#' @param host Character. The host address of the local server.
+#' @return A list with `hostname` and the integer `port`, or `NULL` when
+#'   `host` does not parse or names no hostname.
+#'
+#' @noRd
+host_address <- function(host) {
+  if (!grepl("^[A-Za-z][A-Za-z0-9+.-]*://", host)) {
+    host <- paste0("http://", host)
+  }
+  url <- tryCatch(httr2::url_parse(host), error = function(e) NULL)
+  if (is.null(url) || is.null(url$hostname) || identical(url$hostname, "")) {
+    return(NULL)
+  }
+  list(
+    hostname = sub("^\\[(.*)\\]$", "\\1", url$hostname),
+    port = if (is.null(url$port)) 1234L else as.integer(url$port)
+  )
+}
+
+#' Tell the user how to start the server that `host` names
+#'
+#' [lms_server_start()] starts a server on this machine only, and with no
+#' `port` it uses the port that LM Studio used last. So for a `host` whose
+#' hostname is `localhost`, in any letter case, or `127.0.0.1`, the hint names
+#' the port that [is_server_running()] probes. For any other `host`, or one
+#' that does not parse, the hint names the host and no start call.
+#'
+#' @param host Character. The host address of the call.
+#' @return A string, formatted, for use as a value in a cli message.
+#'
+#' @noRd
+no_server_hint <- function(host) {
+  address <- host_address(host)
+  local <- !is.null(address) &&
+    tolower(address$hostname) %in% c("localhost", "127.0.0.1")
+  if (local) {
+    port <- address$port
+    return(cli::format_inline(
+      "Run {.code lms_server_start(port = {port})} first."
+    ))
+  }
+  cli::format_inline(
+    "Start the LM Studio server at {.val {host}}, or give {.arg host} the address that your server listens on."
   )
 }
 
@@ -738,8 +786,9 @@ is_server_running <- function(host = "http://localhost:1234") {
 #' @noRd
 stop_if_no_server <- function(host = "http://localhost:1234") {
   if (!is_server_running(host)) {
+    hint <- no_server_hint(host)
     cli::cli_abort(
-      "The LM Studio server is not running. Run {.fn lms_server_start} first.",
+      c("The LM Studio server is not running.", "i" = "{hint}"),
       class = "rlmstudio_no_server",
       call = NULL
     )
@@ -754,9 +803,8 @@ stop_if_no_server <- function(host = "http://localhost:1234") {
 #' The answer is `TRUE` only when the request returns HTTP status 200 and the
 #' response body is a model list that [list_models()] can read. The two
 #' functions apply the same shape rules, which the "Malformed model list"
-#' section of [list_models()] states. An empty list counts, because a
-#' fresh LM Studio install has no models downloaded yet and its server still
-#' works.
+#' section of [list_models()] states. An empty list counts, so a server that
+#' lists no models gives `TRUE`.
 #'
 #' Use this in place of a port check. Another process holding the port, a
 #' server that has not finished starting, and a server that rejects the token
@@ -792,11 +840,11 @@ stop_if_no_server <- function(host = "http://localhost:1234") {
 #' * A `host` that is a character `NA`. httr2 reports that `url` must be a
 #'   single string, not a character `NA`.
 #' * A `host` that is one string but cannot be parsed as a URL. curl reports
-#'   that it failed to parse the URL and names the reason. A `host` holding a
-#'   space gives "Malformed input to a URL function". An empty `host` gives
-#'   a reason that says the URL has no host. Its wording depends on the
-#'   libcurl version, for example "No host part in the URL" or "No host
-#'   present".
+#'   that it failed to parse the URL and names the reason. The wording of the
+#'   reason depends on the libcurl version. For a `host` holding a space, the
+#'   reason is for example "Malformed input to a URL function" or "Bad
+#'   hostname". For an empty `host`, it says that the URL has no host, for
+#'   example "No host part in the URL" or "No host present".
 #' * A `timeout` below one millisecond. httr2 reports that `seconds` must be
 #'   greater than 1 ms.
 #' * A `timeout` that is not one number, such as a string or a vector of two.
@@ -819,7 +867,7 @@ stop_if_no_server <- function(host = "http://localhost:1234") {
 #'
 #' @examples
 #' \dontrun{
-#' lms_server_start()
+#' lms_server_start(port = 1234)
 #'
 #' if (lms_server_ready()) {
 #'   list_models()

@@ -328,10 +328,29 @@ run_route_batch <- function(route, format) {
   ))
 }
 
+# The OpenAI route returns no logprobs, so its batch also gives one warning of
+# class `rlmstudio_no_logprobs` (D-043). Split it from the other warnings.
+split_no_logprobs <- function(warnings) {
+  is_no_logprobs <- vapply(
+    warnings,
+    function(w) inherits(w, "rlmstudio_no_logprobs"),
+    logical(1)
+  )
+  list(no_logprobs = warnings[is_no_logprobs], other = warnings[!is_no_logprobs])
+}
+
 test_that("the openresponses and openai routes keep the logprobs results", {
+  withr::local_options(rlmstudio.quiet = FALSE)
   for (route in names(logprobs_route_replies)) {
+    expected_no_logprobs <- if (route == "openai") 1L else 0L
     lst <- run_route_batch(route, "list")
-    expect_identical(lst$warnings, list(), info = route)
+    lst_warnings <- split_no_logprobs(lst$warnings)
+    expect_identical(lst_warnings$other, list(), info = route)
+    expect_identical(
+      length(lst_warnings$no_logprobs),
+      expected_no_logprobs,
+      info = route
+    )
     # `expect_type()` and `expect_s3_class()` take no `info`, so these name
     # the route through `expect_true()`.
     expect_true(is.list(lst$value), info = route)
@@ -341,18 +360,187 @@ test_that("the openresponses and openai routes keep the logprobs results", {
 
     vec <- run_route_batch(route, "vector")
     expect_identical(vec$value, lst$value, info = route)
-    shown <- warning_texts(vec$warnings)
-    expect_identical(length(shown), 1L, info = route)
-    expect_match(
-      shown,
-      "cannot store logprobs dataframes. Returning list.",
-      fixed = TRUE,
+    vec_warnings <- split_no_logprobs(vec$warnings)
+    expect_identical(
+      length(vec_warnings$no_logprobs),
+      expected_no_logprobs,
       info = route
     )
+    shown <- warning_texts(vec_warnings$other)
+    expect_identical(length(shown), 1L, info = route)
+    expect_match(shown, "Returning list.", fixed = TRUE, info = route)
+    # An OpenAI reply holds no logprobs data frame, so its text names the
+    # result objects instead.
+    if (route == "openai") {
+      expect_match(shown, "lms_chat_result", fixed = TRUE, info = route)
+      expect_no_match(shown, "logprobs dataframes", fixed = TRUE, info = route)
+    } else {
+      expect_match(
+        shown,
+        "cannot store logprobs dataframes. Returning list.",
+        fixed = TRUE,
+        info = route
+      )
+    }
 
     df <- run_route_batch(route, "data.frame")$value
     expect_true("logprobs" %in% names(df), info = route)
     expect_true(is.list(df$logprobs), info = route)
     expect_identical(df$output, c("reply 1", "reply 2"), info = route)
   }
+})
+
+# Run an OpenAI vector batch with `logprobs = TRUE` against a mocked server
+# that answers the inputs with `responses`, in order.
+run_openai_vector_batch <- function(responses, quiet = TRUE, schema = NULL) {
+  testthat::local_mocked_bindings(is_server_running = function(...) TRUE)
+  local_request_sequence(responses)
+  collect_warnings(lms_chat_batch(
+    "a-model",
+    sprintf("input %d", seq_along(responses)),
+    format = "vector",
+    quiet = quiet,
+    api_type = "openai",
+    logprobs = TRUE,
+    schema = schema
+  ))
+}
+
+openai_read <- function(k) {
+  mock_response(200L, completion_body(quoted(sprintf("reply %d", k))))
+}
+openai_cut_off <- function(k) {
+  mock_response(
+    200L,
+    completion_body(quoted(sprintf("reply %d", k)), finish_reason = "length")
+  )
+}
+openai_failed <- function() {
+  mock_response(500L, '{"error": {"message": "boom"}}')
+}
+
+# The class of each warning, in order. A warning with neither class, such as
+# the vector fallback or the failed-inputs warning, is "other".
+warning_kinds <- function(warnings) {
+  vapply(
+    warnings,
+    function(w) {
+      if (inherits(w, "rlmstudio_no_logprobs")) {
+        "no_logprobs"
+      } else if (inherits(w, "rlmstudio_reply_cut_off")) {
+        "cut_off"
+      } else {
+        "other"
+      }
+    },
+    character(1)
+  )
+}
+
+expect_openai_fallback_text <- function(text, info) {
+  expect_match(text, "lms_chat_result", fixed = TRUE, info = info)
+  expect_match(text, "Returning list.", fixed = TRUE, info = info)
+  expect_no_match(text, "logprobs dataframes", fixed = TRUE, info = info)
+}
+
+test_that("the openai vector fallback names the result objects", {
+  withr::local_options(rlmstudio.quiet = FALSE)
+  schemas <- list(none = NULL, score = score_schema)
+  for (quiet in c(TRUE, FALSE)) {
+    for (s in names(schemas)) {
+      info <- paste("quiet", quiet, "schema", s)
+      replies <- list(openai_read(1L), openai_read(2L))
+      vec <- run_openai_vector_batch(replies, quiet, schemas[[s]])
+      testthat::local_mocked_bindings(is_server_running = function(...) TRUE)
+      local_request_sequence(replies)
+      lst <- suppressWarnings(lms_chat_batch(
+        "a-model",
+        c("input 1", "input 2"),
+        format = "list",
+        quiet = quiet,
+        api_type = "openai",
+        logprobs = TRUE,
+        schema = schemas[[s]]
+      ))
+      expect_identical(vec$value, lst, info = info)
+      expect_identical(
+        warning_kinds(vec$warnings),
+        c("other", "no_logprobs"),
+        info = info
+      )
+      expect_openai_fallback_text(warning_texts(vec$warnings)[[1]], info)
+    }
+  }
+
+  # The option does not hide the warning either.
+  withr::local_options(rlmstudio.quiet = TRUE)
+  vec <- run_openai_vector_batch(list(openai_read(1L)), quiet = NULL)
+  expect_identical(warning_kinds(vec$warnings), c("other", "no_logprobs"))
+  expect_openai_fallback_text(warning_texts(vec$warnings)[[1]], "option")
+})
+
+test_that("the openai vector fallback comes first among the batch warnings", {
+  withr::local_options(rlmstudio.quiet = FALSE)
+  for (quiet in c(TRUE, FALSE)) {
+    res <- run_openai_vector_batch(
+      list(openai_read(1L), openai_cut_off(2L)),
+      quiet = quiet
+    )
+    expect_identical(
+      warning_kinds(res$warnings),
+      c("other", "cut_off", "no_logprobs"),
+      info = paste("quiet", quiet)
+    )
+    expect_openai_fallback_text(
+      warning_texts(res$warnings)[[1]],
+      paste("cut off, quiet", quiet)
+    )
+
+    # A failed input carries the fallback text in the failed-inputs warning,
+    # wherever it sits in the batch.
+    arrangements <- list(
+      first = list(openai_failed(), openai_read(2L), openai_cut_off(3L)),
+      last = list(openai_read(1L), openai_cut_off(2L), openai_failed())
+    )
+    for (where in names(arrangements)) {
+      info <- paste(where, "quiet", quiet)
+      res <- run_openai_vector_batch(arrangements[[where]], quiet = quiet)
+      expect_identical(
+        warning_kinds(res$warnings),
+        c("other", "cut_off", "no_logprobs"),
+        info = info
+      )
+      shown <- warning_texts(res$warnings)[[1]]
+      position <- if (where == "first") "position 1" else "position 3"
+      expect_match(shown, "1 input failed", fixed = TRUE, info = info)
+      expect_match(shown, position, fixed = TRUE, info = info)
+      expect_openai_fallback_text(shown, info)
+    }
+  }
+})
+
+test_that("an openresponses failed input carries the fallback text", {
+  withr::local_options(rlmstudio.quiet = FALSE)
+  testthat::local_mocked_bindings(is_server_running = function(...) TRUE)
+  local_request_sequence(list(
+    mock_response(200L, logprobs_route_replies$openresponses(1L)),
+    openai_failed()
+  ))
+  res <- collect_warnings(lms_chat_batch(
+    "a-model",
+    c("input 1", "input 2"),
+    format = "vector",
+    quiet = TRUE,
+    api_type = "openresponses",
+    logprobs = TRUE
+  ))
+  # One warning: the failed-inputs warning, with the reason in it.
+  expect_identical(warning_kinds(res$warnings), "other")
+  shown <- warning_texts(res$warnings)[[1]]
+  expect_match(shown, "1 input failed, at position 2", fixed = TRUE)
+  expect_match(
+    shown,
+    "cannot store logprobs dataframes. Returning list.",
+    fixed = TRUE
+  )
 })

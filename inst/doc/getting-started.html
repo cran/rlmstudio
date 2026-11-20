@@ -356,7 +356,9 @@ messages of the package call it the CLI. The package uses
 have LM Studio yet, run
 <code>rlmstudio::install_lmstudio(method = &quot;browser&quot;)</code>. It opens
 the LM Studio download page in your web browser. After you install LM
-Studio, restart R.</p>
+Studio, open the app once, and then restart R. The LM Studio
+documentation says that you need to run LM Studio at least once before
+you can use <code>lms</code>.</p>
 <p>Load the package and check that R can find LM Studio.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(rlmstudio)</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
@@ -384,9 +386,13 @@ many seconds it waits. If the wait runs out, the function gives a
 warning, and your script goes on. So call
 <code>lms_server_ready()</code> next. It returns <code>TRUE</code> only
 when LM Studio answers.</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Start the server, and wait about 30 seconds for it to answer</span></span>
-<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">lms_server_start</span>(<span class="at">wait =</span> <span class="dv">30</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server started successfully on the default port.</span></span>
+<p>The number at the end of the address, 1234, is the port. Without a
+<code>port</code> argument, the server starts on the port that it used
+last time. If that port is not 1234, the calls of this vignette do not
+reach the server. So pass <code>port = 1234</code>.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="co"># Start the server on port 1234, and wait about 30 seconds for it to answer</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="fu">lms_server_start</span>(<span class="at">port =</span> <span class="dv">1234</span>, <span class="at">wait =</span> <span class="dv">30</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server started successfully on port 1234.</span></span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a></span>
 <span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co"># TRUE if LM Studio answers</span></span>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="fu">lms_server_ready</span>()</span>
@@ -404,23 +410,35 @@ memory, which a later section explains.</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># The models on this computer, one row each</span></span>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">list_models</span>()</span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt;      state      type          display_name                                  key</span></span>
-<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt; 1 unloaded       llm           Gemma 4 E4B                   google/gemma-4-e4b</span></span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; 2 unloaded       llm   Gemma 4 26B A4B QAT           google/gemma-4-26b-a4b-qat</span></span>
-<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; 3 unloaded       llm         Qwen3 4B 2507                   qwen/qwen3-4b-2507</span></span>
-<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; 4 unloaded       llm            Gemma 3 1B                    google/gemma-3-1b</span></span>
-<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt; 5 unloaded embedding Nomic Embed Text v1.5 text-embedding-nomic-embed-text-v1.5</span></span>
-<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt;   architecture size_gb</span></span>
-<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; 1       gemma4    6.39</span></span>
-<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt; 2       gemma4   14.57</span></span>
-<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt; 3        qwen3    2.12</span></span>
-<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#&gt; 4  gemma3_text    0.72</span></span>
-<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; 5         &lt;NA&gt;    0.08</span></span></code></pre></div>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt; 1 unloaded       llm             Lfm2 350m                     liquid/lfm2-350m</span></span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; 2 unloaded       llm    Functiongemma 270m            google/functiongemma-270m</span></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="co">#&gt; 3 unloaded       llm           Gemma 4 E4B                   google/gemma-4-e4b</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a><span class="co">#&gt; 4 unloaded       llm   Gemma 4 26B A4B QAT           google/gemma-4-26b-a4b-qat</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt; 5 unloaded       llm         Qwen3 4B 2507                   qwen/qwen3-4b-2507</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt; 6 unloaded       llm            Gemma 3 1B                    google/gemma-3-1b</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; 7 unloaded embedding Nomic Embed Text v1.5 text-embedding-nomic-embed-text-v1.5</span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt;   architecture size_gb</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt; 1         lfm2    0.36</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#&gt; 2  gemma3_text    0.53</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; 3       gemma4    6.39</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co">#&gt; 4       gemma4   14.57</span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">#&gt; 5        qwen3    2.12</span></span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; 6  gemma3_text    0.72</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt; 7         &lt;NA&gt;    0.08</span></span></code></pre></div>
 <p>On a new install, you have no model to chat with yet. LM Studio comes
 with an embedding model, a model that turns text into numbers and does
 not chat. The next section downloads a model that you can chat with.
 This vignette uses <code>google/gemma-3-1b</code>, a small model. Keep
 its key in a variable, so that each call below can use it.</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>model <span class="ot">&lt;-</span> <span class="st">&quot;google/gemma-3-1b&quot;</span></span></code></pre></div>
+<p>To find other models, go to the LM Studio model catalog at <a href="https://lmstudio.ai/models" class="uri">https://lmstudio.ai/models</a>. The address of a model’s own
+page ends with its key. For example, the page of the model above is <a href="https://lmstudio.ai/models/google/gemma-3-1b" class="uri">https://lmstudio.ai/models/google/gemma-3-1b</a>, so its key
+is <code>google/gemma-3-1b</code>. Some catalog pages show a family of
+models, such as the sizes of one model. Open the page of one model in
+the family to get its key. A model page can also show an
+<code>lms get</code> command. The model name in that command is not
+always a key that <code>lms_download()</code> accepts, so use the end of
+the page address.</p>
 </div>
 <div id="download-the-model" class="section level2">
 <h2>Download the model</h2>
@@ -428,11 +446,17 @@ its key in a variable, so that each call below can use it.</p>
 model that is already on your computer, it returns
 <code>&quot;already_downloaded&quot;</code>. For a new model, it returns a job id,
 a string that names the download. Pass the job id to
-<code>lms_download_status()</code> to see the status of the download.
-Call <code>lms_download_status()</code> again until the status says that
-the download finished.</p>
+<code>lms_download_status()</code> to see the status of the
+download.</p>
+<p>The <code>status</code> element of the result holds the status. While
+LM Studio downloads the model, it is <code>&quot;downloading&quot;</code>. Call
+<code>lms_download_status()</code> again until it is
+<code>&quot;completed&quot;</code>, which means that the download finished. If it
+is <code>&quot;failed&quot;</code>, the download did not finish. If you pass
+<code>&quot;already_downloaded&quot;</code> to <code>lms_download_status()</code>,
+the status is <code>&quot;already_downloaded&quot;</code>.</p>
 <p>When the output below was made, the model was already on the
-computer. So the output shows the first case.</p>
+computer. So the output shows <code>&quot;already_downloaded&quot;</code>.</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="co"># Download the model, or find that it is already on disk</span></span>
 <span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>job_id <span class="ot">&lt;-</span> <span class="fu">lms_download</span>(model)</span>
 <span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="co">#&gt; ℹ Initiating download for model: &quot;google/gemma-3-1b&quot;...</span></span>
@@ -443,10 +467,9 @@ computer. So the output shows the first case.</p>
 <span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; [1] &quot;already_downloaded&quot;</span></span>
 <span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a></span>
 <span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co"># The status of the download</span></span>
-<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="fu">lms_download_status</span>(job_id)</span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt; </span></span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; ── Download Job: &quot;N/A&quot;</span></span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a><span class="co">#&gt; Status: already_downloaded</span></span></code></pre></div>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>status <span class="ot">&lt;-</span> <span class="fu">lms_download_status</span>(job_id)</span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>status<span class="sc">$</span>status</span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; [1] &quot;already_downloaded&quot;</span></span></code></pre></div>
 </div>
 <div id="put-the-model-in-memory" class="section level2">
 <h2>Put the model in memory</h2>
@@ -457,7 +480,7 @@ model before the chat.</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="co"># Read the model into memory</span></span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a><span class="fu">lms_load</span>(model)</span>
 <span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a><span class="co">#&gt; ℹ Loading model: &quot;google/gemma-3-1b&quot;...</span></span>
-<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; loaded and verified. [7.2s]</span></span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; loaded and verified. [5.4s]</span></span>
 <span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co">#&gt; </span></span></code></pre></div>
 </div>
 <div id="chat-with-the-model" class="section level2">
@@ -477,7 +500,7 @@ reply. The <code>system_prompt</code> argument of
 <span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a></span>
 <span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co"># Print the text of the reply</span></span>
 <span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="fu">cat</span>(reply)</span>
-<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co">#&gt; Hello there, welcome to the world of R!</span></span></code></pre></div>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co">#&gt; Hello there, welcome to the world of R! 😊</span></span></code></pre></div>
 </div>
 <div id="send-several-prompts-in-one-call" class="section level2">
 <h2>Send several prompts in one call</h2>
@@ -521,7 +544,7 @@ server.</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="co"># Remove the model from memory</span></span>
 <span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">lms_unload</span>(model)</span>
 <span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="co">#&gt; ℹ Unloading model: &quot;google/gemma-3-1b&quot;...</span></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; unloaded successfully. [585ms]</span></span>
+<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; unloaded successfully. [666ms]</span></span>
 <span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="co">#&gt; </span></span>
 <span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a></span>
 <span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="co"># Stop the local server</span></span>
@@ -534,7 +557,7 @@ server.</p>
 remote computer that you reach over a network. This is called a headless
 setup. <code>vignette(&quot;headless-config&quot;)</code> shows how to install and
 use LM Studio that way.</p>
-<!-- Knitted from getting-started.Rmd.orig with MD5 5c8e93ec856d118500f5fd609208c692. -->
+<!-- Knitted from getting-started.Rmd.orig with MD5 f0b111c0fa87bcd695662ad6101da934. -->
 </div>
 
 

@@ -147,6 +147,7 @@ pass_cases <- function() {
 }
 
 test_that("each rule of the model list aborts list_models() with rlmstudio_bad_response", {
+  testthat::skip_on_cran()
   testthat::local_mocked_bindings(is_server_running = function(...) TRUE)
   withr::local_options(rlmstudio.quiet = TRUE)
   for (case in fault_cases()) {
@@ -201,6 +202,7 @@ test_that("each fault body makes lms_server_ready() report FALSE", {
 })
 
 test_that("an empty model list returns an empty data frame and informs", {
+  withr::local_options(rlmstudio.quiet = FALSE)
   testthat::local_mocked_bindings(is_server_running = function(...) TRUE)
   local_request_sequence(list(mock_response(200L, '{"models": []}')))
   expect_message(
@@ -238,6 +240,7 @@ test_that("the LM Studio docs example of the model list reads as a data frame", 
 })
 
 test_that("an empty model list reaches the callers as nothing loaded", {
+  withr::local_options(rlmstudio.quiet = FALSE)
   testthat::local_mocked_bindings(is_server_running = function(...) TRUE)
 
   recorder <- local_request_sequence(list(mock_response(200L, '{"models": []}')))

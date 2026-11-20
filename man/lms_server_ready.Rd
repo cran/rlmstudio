@@ -31,9 +31,8 @@ whether the answer came from an LM Studio server that this package can use.
 The answer is \code{TRUE} only when the request returns HTTP status 200 and the
 response body is a model list that \code{\link[=list_models]{list_models()}} can read. The two
 functions apply the same shape rules, which the "Malformed model list"
-section of \code{\link[=list_models]{list_models()}} states. An empty list counts, because a
-fresh LM Studio install has no models downloaded yet and its server still
-works.
+section of \code{\link[=list_models]{list_models()}} states. An empty list counts, so a server that
+lists no models gives \code{TRUE}.
 }
 \details{
 Use this in place of a port check. Another process holding the port, a
@@ -56,11 +55,11 @@ single string, not a character vector.
 \item A \code{host} that is a character \code{NA}. httr2 reports that \code{url} must be a
 single string, not a character \code{NA}.
 \item A \code{host} that is one string but cannot be parsed as a URL. curl reports
-that it failed to parse the URL and names the reason. A \code{host} holding a
-space gives "Malformed input to a URL function". An empty \code{host} gives
-a reason that says the URL has no host. Its wording depends on the
-libcurl version, for example "No host part in the URL" or "No host
-present".
+that it failed to parse the URL and names the reason. The wording of the
+reason depends on the libcurl version. For a \code{host} holding a space, the
+reason is for example "Malformed input to a URL function" or "Bad
+hostname". For an empty \code{host}, it says that the URL has no host, for
+example "No host part in the URL" or "No host present".
 \item A \code{timeout} below one millisecond. httr2 reports that \code{seconds} must be
 greater than 1 ms.
 \item A \code{timeout} that is not one number, such as a string or a vector of two.
@@ -80,7 +79,7 @@ package rather than from httr2.
 
 \examples{
 \dontrun{
-lms_server_start()
+lms_server_start(port = 1234)
 
 if (lms_server_ready()) {
   list_models()

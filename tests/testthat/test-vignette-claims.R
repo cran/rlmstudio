@@ -355,6 +355,7 @@ test_that("check_lms_version() is TRUE from version 0.4.0 and FALSE below it", {
 })
 
 test_that("install_lmstudio() with the browser method opens the download page", {
+  withr::local_options(rlmstudio.quiet = FALSE)
   local_mocked_bindings(has_lms = function() FALSE)
   opened <- character()
   local_mocked_bindings(
@@ -362,9 +363,15 @@ test_that("install_lmstudio() with the browser method opens the download page", 
     .package = "utils"
   )
 
-  claim_messages(install_lmstudio(method = "browser"))
+  shown <- claim_messages(install_lmstudio(method = "browser"))
 
   expect_identical(opened, "https://lmstudio.ai/download")
+  # The LM Studio documentation says to run the app once before lms works.
+  expect_match(
+    cli::ansi_strip(paste(shown, collapse = "")),
+    "open the LM Studio app once, then restart R",
+    fixed = TRUE
+  )
 })
 
 test_that("list_models() asks localhost:1234 by default and gives one row per model", {
@@ -399,6 +406,30 @@ test_that("lms_download_status() of already_downloaded reports that status and s
 
   expect_s3_class(res, "lms_download_status")
   expect_identical(res$status, "already_downloaded")
+})
+
+test_that("lms_download_status() gives completed for a finished job and already_downloaded for a model on disk, under status", {
+  testthat::local_mocked_bindings(is_server_running = function(...) TRUE)
+  # A finished job, with made-up values. On 2026-10-18, LM Studio gave a
+  # finished job the status "completed" and a `completed_at` field.
+  body <- paste0(
+    '{"job_id": "job_1", "downloaded_bytes": 10, "total_size_bytes": 10, ',
+    '"started_at": "2026-10-18T18:48:58.595Z", "status": "completed", ',
+    '"completed_at": "2026-10-18T18:49:13.103Z"}'
+  )
+  recorder <- local_request_recorder(mock_response(200L, body))
+
+  finished <- lms_download_status("job_1")
+  on_disk <- lms_download_status("already_downloaded")
+
+  expect_identical(finished$status, "completed")
+  expect_identical(on_disk$status, "already_downloaded")
+  # Only the job id goes to the server.
+  expect_identical(length(recorder$requests), 1L)
+  expect_identical(
+    request_target(recorder$requests[[1]])[["path"]],
+    "/api/v1/models/download/status/job_1"
+  )
 })
 
 test_that("lms_chat() sends the input and the system prompt and returns the reply text", {
@@ -482,6 +513,7 @@ consent_install <- function(interactive, answer = NA, allow = NA, lms_found = FA
 }
 
 test_that("install_lmstudio() with the headless method runs the LM Studio install script", {
+  withr::local_options(rlmstudio.quiet = FALSE)
   res <- consent_install(interactive = TRUE, answer = TRUE)
   expect_null(res$shown$error)
   expect_length(res$runs, 1L)
@@ -491,6 +523,12 @@ test_that("install_lmstudio() with the headless method runs the LM Studio instal
     "curl -fsSL https://lmstudio.ai/install.sh | bash",
     fixed = TRUE
   )
+  # The last message, after the success line, names the port to start on,
+  # because with no port LM Studio uses the port that it used last.
+  shown <- gsub("[[:space:]]+", " ", cli::ansi_strip(res$shown$messages))
+  expect_match(shown, "installed successfully.", fixed = TRUE)
+  last <- sub(".*installed successfully\\.", "", shown)
+  expect_match(last, "lms_server_start(port = 1234)", fixed = TRUE)
 })
 
 test_that("install_lmstudio() at the console asks first and installs only on yes", {
@@ -604,6 +642,7 @@ test_that("lms_daemon_status() returns the lines that lms status prints", {
 })
 
 test_that("lms_daemon_stop() returns TRUE when the daemon stopped or was not running", {
+  withr::local_options(rlmstudio.quiet = FALSE)
   local_lms_calls()
   stopped <- NULL
   capture_shown(stopped <- lms_daemon_stop())
@@ -626,7 +665,48 @@ test_that("lms_daemon_stop(force = TRUE) stops the server before the daemon", {
   expect_identical(calls$args, list(c("server", "stop"), c("daemon", "down")))
 })
 
+test_that("lms_server_start(port = 1234) passes the port to lms server start", {
+  calls <- local_lms_calls()
+
+  claim_messages(lms_server_start(port = 1234, wait = 0))
+
+  expect_identical(calls$args, list(c("server", "start", "--port", "1234")))
+})
+
+test_that("each server start in the README and the vignette sources passes port = 1234", {
+  # A start with no port reuses the port LM Studio used last, and the calls
+  # after it ask localhost:1234. R CMD check builds without these sources
+  # (.Rbuildignore), so the test skips there.
+  sources <- c(
+    testthat::test_path("../../README.Rmd"),
+    list.files(
+      testthat::test_path("../../vignettes"),
+      pattern = "\\.Rmd\\.orig$",
+      full.names = TRUE
+    )
+  )
+  sources <- sources[file.exists(sources)]
+  skip_if(length(sources) == 0, "No README or vignette sources to read.")
+
+  starts <- character()
+  for (source in sources) {
+    lines <- readLines(source, warn = FALSE)
+    hits <- grep("^ *lms_server_start\\(", lines)
+    starts <- c(starts, paste0(basename(source), ":", hits, ": ", lines[hits]))
+  }
+  for (start in starts) {
+    test_that(start, {
+      # The port ends the argument, so port = 12345 does not pass.
+      expect_match(start, "port = 1234[,)]")
+    })
+  }
+  # A pattern that silently matches nothing would pass every file. This
+  # check comes after the subtests, where the result table keeps it.
+  expect_gt(length(starts), 0)
+})
+
 test_that("lms_server_stop() sends server stop alone and reports the stop", {
+  withr::local_options(rlmstudio.quiet = FALSE)
   calls <- local_lms_calls()
 
   shown <- capture_shown(status <- withVisible(lms_server_stop()))
@@ -747,7 +827,14 @@ test_that("lms_chat() returns log probabilities on the default route alone", {
   ))
 
   default <- lms_chat("a-model", "hi", logprobs = TRUE)
-  openai <- lms_chat("a-model", "hi", api_type = "openai", logprobs = TRUE)
+  # The route returns no logprobs, so the call gives one warning of its class
+  # (D-043). collect_warnings() counts each warning.
+  openai_run <- collect_warnings(
+    lms_chat("a-model", "hi", api_type = "openai", logprobs = TRUE)
+  )
+  openai <- openai_run$value
+  expect_identical(length(openai_run$warnings), 1L)
+  expect_s3_class(openai_run$warnings[[1]], "rlmstudio_no_logprobs")
   expect_warning(
     native <- lms_chat("a-model", "hi", api_type = "native", logprobs = TRUE),
     "does not support logprobs",
@@ -796,7 +883,8 @@ test_that("lms_chat() sends a request option under its name, a misspelled name i
 
 test_that("lms_chat() on the native route returns a reply from another model with no error", {
   testthat::local_mocked_bindings(is_server_running = function(...) TRUE)
-  # The model check runs on two routes alone (D-025). A live native reply has
+  # The model check runs on two chat routes alone (D-025), and on
+  # /v1/embeddings (D-046). A live native reply has
   # no model field, but this one carries one, so a check that reads either
   # field turns the test red.
   body <- json_object(

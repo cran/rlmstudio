@@ -95,7 +95,7 @@
 #' \itemize{
 #'   \item If \code{simplify = FALSE}, returns a parsed list of the raw JSON response.
 #'   \item If \code{simplify = TRUE} and \code{logprobs = FALSE}, returns a single character string containing the model's text response. With a \code{schema}, it returns the reply parsed into an R value instead.
-#'   \item If \code{simplify = TRUE} and \code{logprobs = TRUE} (and the chosen API type supports it), returns an object of class \code{lms_chat_result} containing both the text and a data.frame of token probabilities.
+#'   \item If \code{simplify = TRUE} and \code{logprobs = TRUE} on the \code{"openresponses"} route, returns an object of class \code{lms_chat_result} containing both the text and a data.frame of token probabilities, or the text alone when no part of the reply carries log probabilities. With \code{api_type = "openai"}, the \code{logprobs} of that object is \code{NULL}, and the call gives a warning of class \code{rlmstudio_no_logprobs}. The \code{rlmstudio.quiet} option does not hide it.
 #' }
 #'
 #' With `simplify = TRUE` and `api_type = "native"` or
@@ -609,9 +609,11 @@ responses_reply_value <- function(resp, resp_data, logprobs) {
 #' @param token Character or `NULL`. An API token for a server that requires
 #'   authentication. `NULL` reads the `rlmstudio.token` option and then the
 #'   `RLMSTUDIO_API_TOKEN` environment variable. See [rlmstudio_token].
-#' @param logprobs `TRUE` or `FALSE`. Whether to request logprobs (currently
-#'   stubbed by LM Studio). Any other value, `NULL` and `NA` included, aborts
-#'   before the check for a running server.
+#' @param logprobs `TRUE` or `FALSE`. Whether to request logprobs. With
+#'   `simplify = TRUE`, the `logprobs` of the result is `NULL`, because the package reads
+#'   none from this endpoint. Any
+#'   other value, `NULL` and `NA` included, aborts before the check for a
+#'   running server.
 #' @param simplify `TRUE` or `FALSE`. If `TRUE`, parses output to text. Any
 #'   other value, `NULL` and `NA` included, aborts before the check for a
 #'   running server.
@@ -641,8 +643,11 @@ responses_reply_value <- function(resp, resp_data, logprobs) {
 #'   `rlmstudio_bad_response` with either setting of `simplify`. Otherwise,
 #'   returns a character string containing the generated
 #'   text. If \code{logprobs = TRUE}, it returns an \code{lms_chat_result}
-#'   object with the log probabilities populated as \code{NULL} since they are
-#'   currently stubbed in the LM Studio OpenAI endpoint. With
+#'   object whose \code{logprobs} is \code{NULL}, because the package reads no
+#'   log probabilities from this endpoint. Such a call gives a warning of class
+#'   `rlmstudio_no_logprobs` after the cut-off warning, if there is one. The
+#'   `rlmstudio.quiet` option does not hide it. A call whose reply fails gives
+#'   no such warning. Use [lms_chat_openresponses()] for log probabilities. With
 #'   \code{simplify = TRUE}, reply content that is not one string, such as the
 #'   `null` content of a reply that holds only a tool call, raises
 #'   `rlmstudio_bad_response`.
@@ -673,6 +678,7 @@ responses_reply_value <- function(resp, resp_data, logprobs) {
 #' @inheritSection rlmstudio-conditions Malformed chat reply
 #' @inheritSection rlmstudio-conditions Cut-off reply
 #' @inheritSection rlmstudio-conditions Reply from another model
+#' @aliases rlmstudio_no_logprobs
 #' @export
 #' @examples
 #' \dontrun{
@@ -825,11 +831,13 @@ openai_reply_value <- function(resp, resp_data, logprobs, schema) {
   }
 
   if (isTRUE(logprobs)) {
-    # Return S3 object with NULL logprobs (since OpenAI endpoint is a stub in LM Studio)
+    # The package reads no logprobs from this route, so the result holds
+    # `NULL` and the call says so (D-043).
     value <- validate_lms_chat_result(
       new_lms_chat_result(text = res_text, logprobs = NULL)
     )
     warn_if_cut_off(finish_reason)
+    warn_no_openai_logprobs()
     return(value)
   }
   if (!is.null(schema)) {
@@ -880,6 +888,27 @@ warn_if_cut_off <- function(finish_reason) {
   }
 }
 
+#' Warn that the OpenAI route returns no logprobs
+#'
+#' Called only after every check on the reply has passed, and after
+#' `warn_if_cut_off()`, so a reply never both warns and fails. The warning goes
+#' through `cli::cli_warn()` and not through the quiet helpers, because it is
+#' the only sign that the logprobs asked for are missing (D-043).
+#' `lms_chat_batch()` muffles it for each input and gives one warning of the
+#' same class for the batch.
+#'
+#' @noRd
+warn_no_openai_logprobs <- function() {
+  cli::cli_warn(
+    c(
+      "The package reads no log probabilities from the {.val openai} route, so the {.field logprobs} of the result is {.code NULL}.",
+      "i" = "Use {.fn lms_chat_openresponses} or {.code lms_chat(api_type = \"openresponses\")} for log probabilities."
+    ),
+    class = "rlmstudio_no_logprobs",
+    call = NULL
+  )
+}
+
 #' Abort on a response body that is a bare JSON value
 #'
 #' A body such as `5`, `"s"`, or `true` parses to an atomic value, and reading
@@ -907,21 +936,25 @@ check_body_object <- function(resp, resp_data, label, ...) {
   }
 }
 
-#' Abort on a chat reply from a model other than the one asked for
+#' Abort on a chat or embedding reply from a model other than the one asked for
 #'
 #' LM Studio can answer a model name that it cannot find with a reply from
-#' the one chat model it has loaded, under status 200 (M049 work log). The
+#' the one chat model it has loaded, under status 200 (M049 work log), and
+#' `/v1/embeddings` does the same with its one embedding model (D-046). The
 #' `model` field of the reply names the loaded instance that answered. Its id
 #' can differ from the key the caller asked for, so a name that differs
 #' starts one model-list request, and the reply is accepted when the
 #' answering instance belongs to a model whose key equals the asked name in
-#' any letter case (D-025). A reply with no `model` string is not checked.
+#' any letter case (D-025). Inside a batch call, a reply id that a lookup of
+#' that call accepted for the same name starts no other request (D-046). A
+#' reply with no `model` string is not checked.
 #' Fields are read with `[[`, because `$` would read a field whose name only
 #' starts with the one asked for. The asked name is compared as a plain
 #' string, because `identical()` also compares names, class, and the S4 bit.
-#' Both callers reassign `model` to the plain string that `rlm_check_id()`
-#' returns, so it reaches this function with no class. `unclass(model)[[1]]`
-#' keeps the comparison plain for a caller that does not reassign.
+#' The three callers reassign `model` to the plain string that
+#' `rlm_check_id()` returns, so it reaches this function with no class.
+#' `unclass(model)[[1]]` keeps the comparison plain for a caller that does not
+#' reassign.
 #' `unclass()` keeps the S4 bit, and `[[` drops it.
 #'
 #' Runs before the caller's `simplify` branch, so `simplify = FALSE` cannot
@@ -946,7 +979,11 @@ check_reply_model <- function(resp, resp_data, model, host, token, label, ...) {
   if (identical(reply_model, model)) {
     return(invisible())
   }
+  if (reply_model_kept(model, reply_model, host)) {
+    return(invisible())
+  }
   if (reply_model_serves(model, reply_model, host, token, label)) {
+    keep_reply_model(model, reply_model, host)
     return(invisible())
   }
   # The names are placed in the detail as text, so braces in a name that the
@@ -974,11 +1011,78 @@ check_reply_model <- function(resp, resp_data, model, host, token, label, ...) {
   )
 }
 
+# The reply ids that a lookup accepted during the current batch call, as
+# parallel `models`, `ids`, and `hosts` vectors, or NULL outside a batch call.
+# A batch function sets it for the length of its call, so a later reply with a
+# kept id for the same asked name and host sends no lookup (D-046). The host
+# is part of the key, because code that runs during the batch, such as a
+# calling handler, can send a call to another host.
+reply_model_cache <- new.env(parent = emptyenv())
+
+#' Start an empty cache of accepted reply ids for one batch call
+#'
+#' The caller reads `reply_model_cache$kept` and registers
+#' `end_reply_model_cache()` with `on.exit()` before it calls this, so an
+#' interrupt cannot leave the cache on after the call.
+#'
+#' @noRd
+start_reply_model_cache <- function() {
+  reply_model_cache$kept <- list(
+    models = character(),
+    ids = character(),
+    hosts = character()
+  )
+  invisible()
+}
+
+#' Put back the cache that was set before a batch call
+#'
+#' @param old The value of `reply_model_cache$kept` before the call.
+#'
+#' @noRd
+end_reply_model_cache <- function(old) {
+  reply_model_cache$kept <- old
+  invisible()
+}
+
+#' Did a lookup of the current batch call accept this reply id?
+#'
+#' @param model Character. The model name the call sent.
+#' @param reply_model Character. The `model` field of the reply.
+#' @param host Character. The host of the call.
+#' @return `TRUE` when the cache holds the three values together, else
+#'   `FALSE`, also outside a batch call.
+#'
+#' @noRd
+reply_model_kept <- function(model, reply_model, host) {
+  kept <- reply_model_cache$kept
+  !is.null(kept) &&
+    any(kept$models == model & kept$ids == reply_model & kept$hosts == host)
+}
+
+#' Keep a reply id that a lookup accepted, for the rest of the batch call
+#'
+#' Does nothing outside a batch call.
+#'
+#' @inheritParams reply_model_kept
+#'
+#' @noRd
+keep_reply_model <- function(model, reply_model, host) {
+  kept <- reply_model_cache$kept
+  if (!is.null(kept)) {
+    kept$models <- c(kept$models, model)
+    kept$ids <- c(kept$ids, reply_model)
+    kept$hosts <- c(kept$hosts, host)
+    reply_model_cache$kept <- kept
+  }
+  invisible()
+}
+
 #' Does a loaded instance of the asked model have the reply's id?
 #'
 #' Reads the model list of every model type through the checks of
 #' `list_models()`, with no message. A failed lookup raises the condition of
-#' that failure, under a label that names the chat function and the lookup.
+#' that failure, under a label that names the calling function and the lookup.
 #'
 #' @param model Character. The model name the call sent.
 #' @param reply_model Character. The `model` field of the reply.
@@ -991,10 +1095,11 @@ check_reply_model <- function(resp, resp_data, model, host, token, label, ...) {
 reply_model_serves <- function(model, reply_model, host, token, label) {
   lookup_label <- paste0(label, ", because the model-list lookup failed")
   if (!is_server_running(host)) {
+    hint <- no_server_hint(host)
     cli::cli_abort(
       c(
         "x" = "{lookup_label}: the LM Studio server is not running.",
-        "i" = "Run {.fn lms_server_start} first."
+        "i" = "{hint}"
       ),
       class = "rlmstudio_no_server",
       call = NULL
@@ -1855,6 +1960,21 @@ integer_or_na <- function(x) {
 #'   `TRUE` is ignored. The batch then returns what it returns with
 #'   `logprobs = FALSE`, in each format. It gives one warning for the whole
 #'   batch, after the check for a running server, even with `quiet = TRUE`.
+#'   With `api_type = "openai"` and `simplify = TRUE`, the batch sends the
+#'   flag, and the `logprobs` of each reply is `NULL`, because the package
+#'   reads no log probabilities from that route. The batch then gives one
+#'   warning of class `rlmstudio_no_logprobs` that counts those replies, after
+#'   the failed-inputs and cut-off warnings. A batch that aborts on a lost
+#'   server, a refused token, a model the server cannot find, or a reply from
+#'   another model gives it before the abort. The `rlmstudio.quiet` option
+#'   and `quiet = TRUE` do not hide it. A batch in which no reply is read,
+#'   for example because every input fails, gives no such warning.
+#'   With `simplify = TRUE` and `logprobs = TRUE` on the `"openresponses"` or
+#'   `"openai"` route, `format = "vector"` returns the list and says why in a
+#'   warning. The `rlmstudio.quiet` option and `quiet = TRUE` do not hide it.
+#'   In a batch that returns, that reason is a line of the failed-inputs
+#'   warning if an input failed. Otherwise it is its own warning, before any
+#'   cut-off or no-logprobs warning.
 #'   Two values here that [lms_chat()] reads as the same argument abort
 #'   with a message that names the argument. Examples are
 #'   `logprobs = TRUE, logprobs = FALSE`, the shortened names
@@ -1879,7 +1999,7 @@ integer_or_na <- function(x) {
 #'   package reads a whole reply and not a streamed one.
 #' @return The return type depends on the \code{format} argument:
 #' \itemize{
-#'   \item \code{"vector"}: A character vector of responses, with \code{NA} for an input that failed. This format is only supported if \code{simplify = TRUE}, and \code{logprobs = FALSE} or \code{api_type = "native"}. With a \code{schema}, it warns and returns the list instead.
+#'   \item \code{"vector"}: A character vector of responses, with \code{NA} for an input that failed. This format is only supported if \code{simplify = TRUE}, and \code{logprobs = FALSE} or \code{api_type = "native"}. With a \code{schema}, it warns and returns the list instead. With \code{logprobs = TRUE} on the \code{"openresponses"} or \code{"openai"} route, it also warns and returns the list.
 #'   \item \code{"list"}: A list where each element is the response corresponding to the provided input, or the condition for an input that failed. With a \code{schema}, \code{simplify = TRUE}, and \code{logprobs = FALSE}, each element that did not fail is the parsed reply.
 #'   \item \code{"data.frame"}: A data.frame containing \code{input} and \code{output} columns, with \code{NA} in \code{output} for an input that failed. If \code{logprobs = TRUE} on the \code{"openresponses"} or \code{"openai"} route, an additional list-column named \code{logprobs} is included, with \code{NULL} for an input that failed. The \code{"native"} route adds no \code{logprobs} column. With a \code{schema} and \code{logprobs = FALSE}, \code{output} is a list-column of parsed replies, with the condition in place of an input that failed. Columns read from each reply follow \code{output}, or \code{logprobs} when it is there, as described below. With an object \code{schema} and \code{logprobs = FALSE}, one column per schema property comes after them, as described below.
 #' }
@@ -1978,8 +2098,9 @@ integer_or_na <- function(x) {
 #' An `rlmstudio_bad_response` that [lms_chat()] raises for one input fails
 #' that input alone, unless it is an `rlmstudio_model_mismatch`. So does an
 #' `rlmstudio_api_error` with any `status` other than 401, 403, or 404,
-#' unless its `status` is 400 and its `code` is `"model_not_found"`. The batch
-#' goes on to the next input. Where the
+#' unless its `status` is 400 and its `code` is `"model_not_found"` or its
+#' `server_message` starts with "No models loaded". The batch goes on to the
+#' next input. Where the
 #' result is a list, or the `output` list-column that a `schema` gives, the
 #' element for that input holds the condition without its backtrace. An
 #' `rlmstudio_bad_response` for reply content that does not
@@ -2006,11 +2127,14 @@ integer_or_na <- function(x) {
 #' failure" section below. No warning about failed inputs is given.
 #'
 #' The batch aborts in the same way at an `rlmstudio_api_error` with `status`
-#' 400 and the `code` `"model_not_found"`, and at an
+#' 400 and the `code` `"model_not_found"`, at one with `status` 400 whose
+#' `server_message` starts with "No models loaded", and at an
 #' `rlmstudio_model_mismatch`. The `"openai"` and `"openresponses"` routes
 #' give these for a model name that the server cannot find, so every later
-#' input fails in the same way.
-#' See the "Reply from another model" section below.
+#' input fails in the same way. They gave the "No models loaded" status 400
+#' when no model was loaded. Within one batch, a reply id that the model-list
+#' lookup accepted is not looked up again.
+#' See the "API failure" and "Reply from another model" sections below.
 #'
 #' A `previous_response_id` that the server does not hold gives status 400
 #' with the `code` `"invalid_value"` on the native route and
@@ -2110,6 +2234,12 @@ lms_chat_batch <- function(
 
   stop_if_no_server(host)
 
+  # A lookup that keeps a reply id keeps it for the rest of the batch, so a
+  # later reply with that id sends no lookup (D-046).
+  old_cache <- reply_model_cache$kept
+  on.exit(end_reply_model_cache(old_cache), add = TRUE)
+  start_reply_model_cache()
+
   # After the server probe, so a batch that cannot run gives no warning.
   # Shown whatever `quiet` says, because it is the only sign that the
   # logprobs asked for are missing (D-032).
@@ -2150,19 +2280,22 @@ lms_chat_batch <- function(
   abort_with_results <- function(cnd) {
     cnd$results <- results
     warn_cut_off_inputs()
+    warn_no_logprobs_inputs()
     stop(cnd)
   }
   # A refused token or a model the server cannot find fails every input the
   # same way, whatever the prompt, so these statuses abort like a lost server
   # (D-019). The OpenAI and OpenResponses routes answered a model they could
   # not find with status 400 and the code "model_not_found" when two chat
-  # models were loaded (D-025). Any other status can come from one prompt, so
-  # it fails that input alone.
+  # models were loaded (D-025), and with status 400 and the text "No models
+  # loaded" when no model was loaded (D-046). Any other status can come from
+  # one prompt, so it fails that input alone.
   keep_or_abort_api <- function(cnd) {
     if (
       isTRUE(cnd[["status"]] %in% c(401L, 403L, 404L)) ||
         (identical(cnd[["status"]], 400L) &&
-          identical(cnd[["code"]], "model_not_found"))
+          identical(cnd[["code"]], "model_not_found")) ||
+        is_no_models_loaded(cnd)
     ) {
       abort_with_results(cnd)
     }
@@ -2241,6 +2374,28 @@ lms_chat_batch <- function(
       class = "rlmstudio_reply_cut_off"
     )
   }
+  # The number of OpenAI replies that came back with no logprobs. Each input's
+  # own warning is muffled, and the batch gives one warning for all of them
+  # after the cut-off warning (D-043).
+  no_logprobs <- 0L
+  note_no_logprobs <- function(w) {
+    no_logprobs <<- no_logprobs + 1L
+    invokeRestart("muffleWarning")
+  }
+  # Shown whatever `quiet` says, because it is the only sign that the logprobs
+  # asked for are missing (D-043).
+  warn_no_logprobs_inputs <- function() {
+    if (no_logprobs == 0L) {
+      return(invisible())
+    }
+    cli::cli_warn(
+      c(
+        "The package reads no log probabilities from the {.val openai} route, so the {.field logprobs} of {no_logprobs} repl{?y/ies} {?is/are} {.code NULL}.",
+        "i" = "Use {.code api_type = \"openresponses\"} for log probabilities."
+      ),
+      class = "rlmstudio_no_logprobs"
+    )
+  }
   # The dots go through `chat_dots`, where the native route has set the dot
   # that fills `logprobs` to `FALSE` above.
   # `simplify` comes after `...`, so only its exact name matches it, and
@@ -2277,7 +2432,8 @@ lms_chat_batch <- function(
             quote = TRUE
           )
         },
-        rlmstudio_reply_cut_off = note_cut_off
+        rlmstudio_reply_cut_off = note_cut_off,
+        rlmstudio_no_logprobs = note_no_logprobs
       ),
       rlmstudio_api_error = keep_or_abort_api,
       rlmstudio_bad_response = keep_or_abort_bad,
@@ -2305,6 +2461,10 @@ lms_chat_batch <- function(
       vector_fallback <- "The {.val vector} format is not compatible with simplify = FALSE. Returning list."
     } else if (has_parsed) {
       vector_fallback <- "The {.val vector} format cannot store replies parsed from {.arg schema}. Returning list."
+    } else if (has_logprobs && api_type == "openai") {
+      # An OpenAI reply holds no logprobs data frame, only a result object
+      # whose `logprobs` is NULL (D-043).
+      vector_fallback <- "The {.val vector} format cannot store the {.cls lms_chat_result} replies of the {.val openai} route. Returning list."
     } else if (has_logprobs) {
       vector_fallback <- "The {.val vector} format cannot store logprobs dataframes. Returning list."
     }
@@ -2350,6 +2510,7 @@ lms_chat_batch <- function(
   }
 
   warn_cut_off_inputs()
+  warn_no_logprobs_inputs()
 
   # Keyed on the route, not on the replies, so the columns and their types
   # are there even when every input failed. A failed input has no values.
@@ -2601,6 +2762,16 @@ rlm_check_route_dots <- function(dot_names, api_type) {
 
 #' Create a base request for the LM Studio API
 #'
+#' Every request of the package starts here. libcurl reads the proxy
+#' environment variables, such as `http_proxy`, and unless `no_proxy` lists the
+#' host it sends even a request for this machine to the proxy. So when the
+#' hostname of `host` is `localhost`, in any letter case, `127.0.0.1`, or
+#' `::1`, the request sets curl's `noproxy` option to that hostname and goes to
+#' the host directly. A request that starts at any other host follows the
+#' proxy variables. The option replaces the `no_proxy` variable for the whole
+#' request. So if a server at one of the three hosts redirects to another host,
+#' curl sends that request to the proxy, even when `no_proxy` lists that host.
+#'
 #' @param host Character. The host address of the local server.
 #'   Defaults to "http://localhost:1234".
 #' @param token Character or `NULL`. An API token for a server that requires
@@ -2615,7 +2786,7 @@ rlm_check_route_dots <- function(dot_names, api_type) {
 #'
 #' @examples
 #' \dontrun{
-#' lms_server_start()
+#' lms_server_start(port = 1234)
 #'
 #' req <- lms_client("http://localhost:1234")
 #' # req is a base httr2 request object that can be further modified
@@ -2626,6 +2797,14 @@ lms_client <- function(host = "http://localhost:1234", token = NULL) {
       "Content-Type" = "application/json",
       "Accept" = "application/json"
     )
+
+  address <- host_address(host)
+  if (!is.null(address)) {
+    hostname <- tolower(address$hostname)
+    if (hostname %in% c("localhost", "127.0.0.1", "::1")) {
+      req <- httr2::req_options(req, noproxy = hostname)
+    }
+  }
 
   resolved <- rlm_token(token)
   if (is.null(resolved)) {

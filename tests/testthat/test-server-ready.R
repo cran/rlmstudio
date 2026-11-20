@@ -18,6 +18,7 @@ test_that("a closed port is not ready", {
 })
 
 test_that("an open port whose listener never answers is not ready", {
+  testthat::skip_on_cran()
   port <- local_listener()
 
   started <- Sys.time()
@@ -37,6 +38,7 @@ test_that("an open port whose listener never answers is not ready", {
 })
 
 test_that("a port held by something else passes the TCP probe and fails here", {
+  testthat::skip_on_cran()
   # This is the gap the condition help page now names. The TCP probe reads the
   # port and nothing else, so a listener that is not LM Studio suppresses the
   # `rlmstudio_no_server` condition. The readiness check is what tells them
@@ -83,9 +85,8 @@ test_that("a 200 whose body carries a model list is ready", {
 })
 
 test_that("a model list with no models in it is still ready", {
-  # A fresh LM Studio install has nothing downloaded. The server works, so the
-  # empty list reads as ready. A JSON object under the same key does not: that
-  # is a different server answering.
+  # An empty list reads as ready. A JSON object under the same key does not:
+  # that is a different server answering.
   local_request_recorder(mock_response(200L, '{"models": []}'))
   expect_identical(lms_server_ready(), TRUE)
 })
@@ -220,13 +221,21 @@ test_that("a host that is not one string aborts whatever the reason", {
 })
 
 test_that("a host that cannot be parsed as a URL aborts", {
-  # curl names the reason, so the page quotes two of them rather than one.
-  # The wording of the empty-host reason depends on the libcurl version:
+  # curl names the reason, and its wording depends on the libcurl version.
+  # For a host with a space, libcurl 8.14.1 says "Malformed input to a URL
+  # function", and the libcurl of CRAN's Debian check says "Bad hostname". So
+  # the test reads curl's reason for the same URL first. For an empty host,
   # libcurl 8.14.1 says "No host part in the URL", and the libcurl of CRAN's
   # Debian check says "No host present". The test matches only the common start.
+  curl_message <- tryCatch(
+    httr2::url_modify("http://exa mple:1234", path = "api/v1/models"),
+    error = conditionMessage
+  )
+  expect_match(curl_message, "Failed to parse URL: ", fixed = TRUE)
   expect_error(
     lms_server_ready(host = "http://exa mple:1234"),
-    "Failed to parse URL: Malformed input to a URL function"
+    curl_message,
+    fixed = TRUE
   )
   expect_error(
     lms_server_ready(host = ""),

@@ -1,6 +1,6 @@
 Package: rlmstudio
 Title: Access and Control LM Studio
-Version: 0.3.0
+Version: 0.4.0
 Authors@R: 
     person("Jeffrey", "Girard", , "me@jmgirard.com",
            role = c("aut", "cph", "cre"),
@@ -23,9 +23,9 @@ Config/testthat/edition: 3
 Encoding: UTF-8
 Config/roxygen2/version: 8.1.0
 NeedsCompilation: no
-Packaged: 2026-10-02 19:01:11 UTC; jmgirard
+Packaged: 2026-11-20 19:34:02 UTC; jmgirard
 Author: Jeffrey Girard [aut, cph, cre] (ORCID:
     <https://orcid.org/0000-0002-7359-3746>)
 Maintainer: Jeffrey Girard <me@jmgirard.com>
 Repository: CRAN
-Date/Publication: 2026-10-02 19:40:02 UTC
+Date/Publication: 2026-11-20 20:10:02 UTC

@@ -359,15 +359,16 @@ installing LM Studio, starting the server, and downloading
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a></span>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a>model <span class="ot">&lt;-</span> <span class="st">&quot;google/gemma-3-1b&quot;</span></span>
 <span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a></span>
-<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># Start the server, and wait up to about 30 seconds for it to answer</span></span>
-<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="fu">lms_server_start</span>(<span class="at">wait =</span> <span class="dv">30</span>)</span>
-<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server started successfully on the default port.</span></span>
-<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a></span>
-<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a><span class="co"># Load the model</span></span>
-<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="fu">lms_load</span>(model)</span>
-<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="co">#&gt; ℹ Loading model: &quot;google/gemma-3-1b&quot;...</span></span>
-<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; loaded and verified. [11.7s]</span></span>
-<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#&gt; </span></span></code></pre></div>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co"># Start the server on port 1234, and wait up to about 30 seconds for it to</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co"># answer</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="fu">lms_server_start</span>(<span class="at">port =</span> <span class="dv">1234</span>, <span class="at">wait =</span> <span class="dv">30</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server started successfully on port 1234.</span></span>
+<span id="cb1-9"><a href="#cb1-9" tabindex="-1"></a></span>
+<span id="cb1-10"><a href="#cb1-10" tabindex="-1"></a><span class="co"># Load the model</span></span>
+<span id="cb1-11"><a href="#cb1-11" tabindex="-1"></a><span class="fu">lms_load</span>(model)</span>
+<span id="cb1-12"><a href="#cb1-12" tabindex="-1"></a><span class="co">#&gt; ℹ Loading model: &quot;google/gemma-3-1b&quot;...</span></span>
+<span id="cb1-13"><a href="#cb1-13" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; loaded and verified. [5.8s]</span></span>
+<span id="cb1-14"><a href="#cb1-14" tabindex="-1"></a><span class="co">#&gt; </span></span></code></pre></div>
 </div>
 <div id="three-routes" class="section level2">
 <h2>Three routes</h2>
@@ -431,9 +432,9 @@ send to the model.</p>
 <span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a></span>
 <span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co"># The default route</span></span>
 <span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt)</span>
-<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue \n\nLet me know if you’d like another!&quot;</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
 <span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
-<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_5cf482638f60b6dee10cb5fd6c4b254663ab888f1d48e295&quot;</span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_5c23c03ef83d8f512d9ab56f7e52bebc2d9db1c647495f80&quot;</span></span>
 <span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a></span>
 <span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co"># The OpenAI route</span></span>
 <span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt, <span class="at">api_type =</span> <span class="st">&quot;openai&quot;</span>)</span>
@@ -443,7 +444,7 @@ send to the model.</p>
 <span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt, <span class="at">api_type =</span> <span class="st">&quot;native&quot;</span>)</span>
 <span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
 <span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
-<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_c42e41ec31f20b2124f9fc2e06ccd48f9e9ea586e5e550e7&quot;</span></span></code></pre></div>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_0db7e34b34fcbcc0af9f350056d6d3f96382e0b165ea15b4&quot;</span></span></code></pre></div>
 <p>Each call returns the text of the reply. An attribute is a named
 value that R attaches to an object, and <code>attr()</code> reads it. On
 the default route and the native route, the text also carries a
@@ -467,7 +468,7 @@ below sets it to 0.</p>
 <span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt, <span class="at">temperature =</span> <span class="dv">0</span>)</span>
 <span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
 <span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
-<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_c858e32caaa1abf0bb6b46a3f92492027bcf6b14b50a69cb&quot;</span></span></code></pre></div>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_8cb4abc3dd0935140222559ec7c9852c945362133bb79f5d&quot;</span></span></code></pre></div>
 <p>The package checks a few option names. For example, it stops with an
 error on a <code>stream</code> other than <code>FALSE</code> or
 <code>NULL</code>, because it reads a whole reply and not one sent in
@@ -484,7 +485,7 @@ still returns a reply with no error.</p>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a><span class="fu">lms_chat</span>(model, prompt, <span class="at">temprature =</span> <span class="dv">0</span>)</span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
-<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_e9fa3986708ece2925883ed9f7e59999867016bfe21ca658&quot;</span></span></code></pre></div>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_7b13f2925030cc553d27afe6290adf220ec8e537bdb94ee7&quot;</span></span></code></pre></div>
 <p>So a misspelled option can go unnoticed. A later section shows how to
 see the temperature that the server used. The last section shows what
 the native route does with the same call.</p>
@@ -508,7 +509,7 @@ string from <code>attr(first, &quot;response_id&quot;)</code> also works.</p>
 <span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>first</span>
 <span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; [1] &quot;OK.&quot;</span></span>
 <span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
-<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_342a9e50660c1e6ca25912df33559f6f0c9520f5a5012d3b&quot;</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_4327a0b2d96ce453f4740c96d2d965e7d109fd9973d8a36a&quot;</span></span>
 <span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a></span>
 <span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co"># Ask about the fact in a follow-up</span></span>
 <span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="fu">lms_chat</span>(</span>
@@ -519,7 +520,7 @@ string from <code>attr(first, &quot;response_id&quot;)</code> also works.</p>
 <span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a>)</span>
 <span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Green.&quot;</span></span>
 <span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
-<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_f9f176cf59816d6b3f8c602dfcb91df493e0338c7d8b01ea&quot;</span></span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_af1c56a6a9bf4d57078a532f64fbd6f651136bd00b054136&quot;</span></span>
 <span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a></span>
 <span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co"># Ask the same question with no response id</span></span>
 <span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="fu">lms_chat</span>(</span>
@@ -529,7 +530,7 @@ string from <code>attr(first, &quot;response_id&quot;)</code> also works.</p>
 <span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a>)</span>
 <span id="cb5-29"><a href="#cb5-29" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
 <span id="cb5-30"><a href="#cb5-30" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
-<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_91e29038937144cf4478592485332f092e67d5cf7a5c997d&quot;</span></span></code></pre></div>
+<span id="cb5-31"><a href="#cb5-31" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_2d32b500c9d882c20d49bb02ace4a19f3776cedfaa2414cd&quot;</span></span></code></pre></div>
 <p>With the first reply as <code>previous_response_id</code>, the model
 answered from the first prompt. With no response id, the model did not
 see the first prompt, and its answer was a guess.</p>
@@ -709,7 +710,7 @@ during a request raises an error of the class
 <span id="cb10-29"><a href="#cb10-29" tabindex="-1"></a><span class="fu">chat_or_na</span>(model, prompt, <span class="at">temperature =</span> <span class="dv">0</span>)</span>
 <span id="cb10-30"><a href="#cb10-30" tabindex="-1"></a><span class="co">#&gt; [1] &quot;Blue.&quot;</span></span>
 <span id="cb10-31"><a href="#cb10-31" tabindex="-1"></a><span class="co">#&gt; attr(,&quot;response_id&quot;)</span></span>
-<span id="cb10-32"><a href="#cb10-32" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_220281674e43b24eb1d488881bae74895a8bd66ea524b3c3&quot;</span></span></code></pre></div>
+<span id="cb10-32"><a href="#cb10-32" tabindex="-1"></a><span class="co">#&gt; [1] &quot;resp_cd0ea66d56d42110f5df432485eba1f3192ac29dd0af8980&quot;</span></span></code></pre></div>
 <p>The first call below goes to port 1, where no server runs. The other
 calls misspell the model name or an option.</p>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co"># No server listens at this address</span></span>
@@ -749,13 +750,13 @@ before this vignette.</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" tabindex="-1"></a><span class="co"># Remove the model from memory</span></span>
 <span id="cb12-2"><a href="#cb12-2" tabindex="-1"></a><span class="fu">lms_unload</span>(model)</span>
 <span id="cb12-3"><a href="#cb12-3" tabindex="-1"></a><span class="co">#&gt; ℹ Unloading model: &quot;google/gemma-3-1b&quot;...</span></span>
-<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; unloaded successfully. [525ms]</span></span>
+<span id="cb12-4"><a href="#cb12-4" tabindex="-1"></a><span class="co">#&gt; ✔ Model &quot;google/gemma-3-1b&quot; unloaded successfully. [554ms]</span></span>
 <span id="cb12-5"><a href="#cb12-5" tabindex="-1"></a><span class="co">#&gt; </span></span>
 <span id="cb12-6"><a href="#cb12-6" tabindex="-1"></a></span>
 <span id="cb12-7"><a href="#cb12-7" tabindex="-1"></a><span class="co"># Stop the local server</span></span>
 <span id="cb12-8"><a href="#cb12-8" tabindex="-1"></a><span class="fu">lms_server_stop</span>()</span>
 <span id="cb12-9"><a href="#cb12-9" tabindex="-1"></a><span class="co">#&gt; ✔ LM Studio server stopped successfully.</span></span></code></pre></div>
-<!-- Knitted from chat-options.Rmd.orig with MD5 2a8ae2a16e437bfa1779916f7fd57fd6. -->
+<!-- Knitted from chat-options.Rmd.orig with MD5 4743935643e7825bd3fea435c9e893c3. -->
 </div>
 
 
